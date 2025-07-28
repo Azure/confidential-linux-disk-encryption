@@ -1,0 +1,104 @@
+DSC/DSC.zip
+
+compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*/.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Editor
+*~
+
+# PyInstaller
+#  Usually these files are written by a python script from a template 
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/*
+
+# VMBackup package ignors
+VMBackup/dist
+VMBackup/dist/*
+VMBackup/azure-sdk
+VMBackup/azure-sdk/*
+VMBackup/main/azure/*
+VMBackup/MANIFEST
+#VMBackup/*.pyproj
+VMBackup/*.pyproj.user
+VMBackup/*.suo
+VMBackup/main/safefreeze/bin/*
+
+# CustomScript ignors
+CustomScript/test/download/0/stdout
+CustomScript/test/download/0/errout
+*node_modules/
+
+# VMEncryption ignores
+VMEncryption/main/azure/*
+
+# Common
+Common/psutil/build/*
+Common/psutil/dist/*
+Common/psutil/psutil.egg-info/*
+VMBackup/.vs/VMBackup/v14/.suo
+RDMAUpdate/RDMAUpdate.pyproj.user
+*.sln
+RDMAUpdate/VMBackup.pyproj.user
+VMBackup/.vs/config/applicationhost.config
+RDMAUpdate/.vs/VMBackup/v14/.suo
+
+# Handler Registration ignores
+*.pem
+RDMAUpdate/.vs/RDMAUpdate/v14/.suo
+
+# Visual Studio directory
+.vs/
+
+# Ignore HandlerManifest updates
+VMEncryption/HandlerManifest.json
+VMEncryption/AzureDiskEncryptionForLinux*.xml
+VMEncryption/ADEForLinux*.xml
+VMEncryption/MANIFEST
+
