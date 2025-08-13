@@ -1,0 +1,162 @@
+1.4.0.11
+- Add support for Azure Linux 3
+
+1.4.0.10
+- Fix LVM encryption on RHEL 9
+- Fix null char in stdout 
+
+1.4.0.9
+- Rollover the new version
+
+1.4.0.8
+- Update bls cmdline if grub2 version is greater than 2.06.69
+
+1.4.0.7
+- Onboard Ubuntu 24.04 to online encryption
+- Add support for RHEL 9.3 
+
+1.4.0.6
+- Cleaned SP and DP branches of non ADE files (Build compliance)
+- Fix xfs corruption issue on Ubuntu 22
+- Fix OS disk encryption failure on Ubuntu 22
+
+1.4.0.5
+- For CVM temp disk encryption, do not attempt secure key release if KEK is not provided.
+
+1.4.0.4
+- Add support for boost SKU's
+- Update resid for managedHSM
+- Disbale root login in strip down state
+
+1.4.0.3
+- temp disk encryption for CVM is by default.
+- temp disk encryption for CVM can be controlled by flag NoConfidentialEncryptionTempDisk
+- supported managed ids are (resource id, client id and object id.)
+
+1.4.0.2
+- hotfix for EFA reimage scenario.
+
+1.4.0.1
+- Add official support for RHEL 9.x
+- Resource Disk + EFA Stop Start issue fix
+- Data Disk Disable Bug Fix
+
+1.4.0.0
+-CVM Linux data disk encryption
+-highlights:
+-adding VNS code for test release.
+-using root-fs to store key for auto unlock.
+-passphrase wrap and unwrap using SKR.
+-using LUKS2 header token filed to keep wrapped passphrase for key recovery.
+-Supported OS: ubuntu 20.04 ubuntu 22.04
+
+1.3.0.1
+- Add official support for Mariner 2.0
+
+1.3.0.0
+-Add private support for ADE with ManagedHSM
+-Add flow for encrypting temp disks in a CVM
+
+1.2.0.97
+-Using no proxy, IMDS failure as non terminal.
+-Add Ubuntu 22.04 support. 
+-ADE flow for cvm phase 1- blocking ADE for CVM. 
+
+1.2.0.96
+- Update ade parse script to handle duplicate parameters
+- Use grub2-mkconfig to add kernel parameters
+- Fix RHEL 7.9 no boot after update
+
+1.2.0.95
+- Add support for Mariner
+- Fix centOS no boot issue
+- Onboard CentOS to online encryption
+
+1.2.0.94
+- Enable Linux VMSS OS disk encryption
+
+1.2.0.93
+- Add support for Oracle 8.5
+- Auto support Minor version upgrades
+- Add support for Ubuntu 18.04 ARM64 image
+- Fix bek mount race condition on boot
+
+1.2.0.92
+- Add support for Ubuntu 20.04 ARM64 image
+- Add support for RHEL 8.5
+
+1.2.0.91
+- Enable Online Encryption for data disks
+- Setup encryption layer for all disks and do encryption in background
+
+1.2.0.90
+- Support for RHEL 8.3, 8.4
+- Support for CentOS 8.3, 8.4
+- Add BEK disk validations
+- Fix Key Vault resouce ID check
+
+1.2.0.89
+- avoid apt-get timeouts on isolated networks
+- add grub-pc-bin package if missing on Ubuntu
+- prevent unintended key rotation on case or trailing slash differences
+- fix resource disk logic on D8S_v4_vm size
+- fix status cannot be read issue on Ubuntu 20.04 Gen2
+
+1.2.0.84
+- add support for RHEL 8 SAP image
+- fix RD encryption in Gen2 VMs
+- add error message reporting for WireProtocol errors
+- fix an invalid literal bug
+
+1.2.0.83
+- add support for Ubuntu 20.04
+- fix python3 syntax in handle.py on update encryption settings change 
+- fix resize2fs syntax on distros with python3 + new cryptsetup version
+- fix systemctl crash on RHEL LVM
+
+1.2.0.75 
+- Add support for Gen2 VMs
+- Add support for RHEL 7.9
+- Yum update fix for RHEL 8
+
+1.2.0.72 
+- Add support for VM sizes without Resource Disks
+
+1.2.0.70
+- Add support for Python3
+- Add support for RHEL 8
+- Enable Online encryption for RHEL 8 OS disk encryption
+
+1.1.0.52
+- Ubuntu WWN fix
+
+1.1.0.51
+- Add support for RHEL 7.8
+- Make Resource Disk Encryption synchronus
+
+1.1.0.50
+- adds yaml pipeline files to support cdpx test extension build
+- parameterizes version and extension name to support cdpx
+- removes unused parameter in bekutil
+- fixes fstab parsing
+- adds nofail to fstab if absent
+- adds resource disk to crypttab if crypt mount is used
+- fixes newline issue in telemetry for improved debugging
+- migrates to early unlock if using crypt mount
+- changes sparse mode from 64K to 16M to address LVM with xfs
+- tries mounting /boot/efi for UEFI image support if applicable
+- fixes lvm reliability issue caused by hardcoded sda2 device name
+- adds python-six module for transitions module reliability
+- adds to and updates existing unit tests
+- Fix hardcoded root partition in Ubuntu
+- Fix data disk not getting mounted after disabling encryption.
+- ADE Linux DualPass to SinglePass migration
+- Handle no passphrase file in update encryption settings
+- ADE SinglePass EV2 VSRM Artifacts
+- ADE SinglePass CDPx: Migrating Windows agent to image 1809
+
+1.1.0.48
+-Fix disable after EFA encryption and stop-start
+-Fix missing Python-six module for CentOS 6.8
+-Add CDPx config
+-Migrate CryptMount to Crypttab
