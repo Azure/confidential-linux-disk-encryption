@@ -1,0 +1,403 @@
+#!/usr/bin/env python
+#
+# *********************************************************
+# Copyright (c) Microsoft. All rights reserved.
+#
+# Apache 2.0 License
+#
+# You may obtain a copy of the License at
+# http:#www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+#
+# *********************************************************
+
+""" Functionality to encrypt the Azure resource disk"""
+
+import time
+import os
+
+from CommandExecutor import CommandExecutor
+from Common import CommonVariables, CryptItem
+
+
+class ResourceDiskUtil(object):
+    """ Resource Disk Encryption Utilities """
+    _RD_BASE_DEV_PATH_CACHE = ""
+    DEV_DM_PREFIX = '/dev/dm-'
+    # todo: consolidate this and other key file path references
+    # (BekUtil.py, ExtensionParameter.py, and dracut patches)
+    RD_MAPPER_NAME = 'resourceencrypt'
+    RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
+
+    def __init__(self, logger, disk_util, crypt_mount_config_util, passphrase_filename, public_settings, distro_info, retain_mountpoint):
+        self.logger = logger
+        self.executor = CommandExecutor(self.logger)
+        self.disk_util = disk_util
+        self.crypt_mount_config_util = crypt_mount_config_util
+        self.passphrase_filename = passphrase_filename  # WARNING: This may be null, in which case we mount the resource disk if its unencrypted and do nothing if it is.
+        self.public_settings = public_settings
+        self.distro_info = distro_info
+        self.dev_path_options = [
+            os.path.join(CommonVariables.azure_symlinks_dir, 'resource'),
+            os.path.join(CommonVariables.cloud_symlinks_dir, 'azure_resource'),
+            os.path.join(CommonVariables.azure_symlinks_dir, 'scsi0/lun1')
+        ]
+        self.RD_MOUNT_POINT = '/mnt/resource'
+        if retain_mountpoint == True:
+            device, mountpoint, fs, opts = self._get_rd_fstab_details() 
+            self.RD_MOUNT_POINT = mountpoint
+        self.logger.log("resource disk mount point is {0}".format(self.RD_MOUNT_POINT))
+
+    def _get_rd_base_dev_path(self):
+        if self._RD_BASE_DEV_PATH_CACHE:
+            return self._RD_BASE_DEV_PATH_CACHE
+
+        for option in self.dev_path_options:
+            if os.path.exists(option):
+                self._RD_BASE_DEV_PATH_CACHE = option
+                self.logger.log("Setting RD_BASE_DEV_PATH to " + option)
+                return option
+
+        return self._RD_BASE_DEV_PATH_CACHE
+
+    def _get_rd_dev_path(self):
+        rd_base_path = self._get_rd_base_dev_path()
+        if rd_base_path:
+            return rd_base_path + "-part1"
+
+        return ""
+
+    def _is_encrypt_format_all(self):
+        """ return true if current encryption operation is EncryptFormatAll """
+        encryption_operation = self.public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
+        if encryption_operation in [CommonVariables.EnableEncryptionFormatAll]:
+            return True
+        self.logger.log("Current encryption operation is not EnableEncryptionFormatAll")
+        return False
+
+    def _is_luks_device(self):
+        """ checks if the device is set up with a luks header """
+        if not self._resource_disk_partition_exists():
+            return False
+        cmd = 'cryptsetup isLuks ' + self._get_rd_dev_path()
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
+
+    def _resource_disk_exists(self):
+        """ true if udev name for resource disk exists """
+        rd_base_dev_path = self._get_rd_base_dev_path()
+        if rd_base_dev_path:
+            cmd = 'test -b' + rd_base_dev_path
+            if (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success:
+                self.logger.log("Resource disk exists.")
+                return True
+        self.logger.log("Resource disk does not exist.")
+        return False
+
+    def _resource_disk_partition_exists(self):
+        """ true if udev name for resource disk partition exists """
+        rd_dev_path = self._get_rd_dev_path()
+        if not rd_dev_path:
+            return False
+        cmd = 'test -b ' + rd_dev_path
+        return (int)(self.executor.Execute(cmd, suppress_logging=True)) == CommonVariables.process_success
+
+    def _encrypt(self):
+        """ use disk util with the appropriate device mapper """
+        return (int)(self.disk_util.encrypt_disk(dev_path=self._get_rd_dev_path(),
+                                                 passphrase_file=self.passphrase_filename,
+                                                 mapper_name=self.RD_MAPPER_NAME,
+                                                 header_file=None)) == CommonVariables.process_success
+
+    def _format_encrypted_partition(self):
+        """ make a default file system on top of the crypt layer """
+        make_result = self.disk_util.format_disk(dev_path=self.RD_MAPPER_PATH, file_system=CommonVariables.default_file_system)
+        if make_result != CommonVariables.process_success:
+            self.logger.log(msg="Failed to make file system on ephemeral disk", level=CommonVariables.ErrorLevel)
+            return False
+        # todo - drop DATALOSS_WARNING_README.txt file to disk
+        return True
+
+    def _mount_resource_disk(self, dev_path):
+        """ mount the file system previously made on top of the crypt layer """
+        # ensure that resource disk mount point directory has been created
+        cmd = 'mkdir -p ' + self.RD_MOUNT_POINT
+        if self.executor.Execute(cmd, suppress_logging=True) != CommonVariables.process_success:
+            self.logger.log(msg='Failed to precreate mount point directory: ' + cmd, level=CommonVariables.ErrorLevel)
+            return False
+
+        # mount to mount point directory
+        mount_result = self.disk_util.mount_filesystem(dev_path=dev_path, mount_point=self.RD_MOUNT_POINT)
+        if mount_result != CommonVariables.process_success:
+            self.logger.log(msg="Failed to mount file system on resource disk", level=CommonVariables.ErrorLevel)
+            return False
+        return True
+
+    def _configure_waagent(self):
+        """ turn off waagent.conf resource disk management  """
+        # set ResourceDisk.MountPoint to standard mount point
+        cmd = "sed -i.rdbak1 's|ResourceDisk.MountPoint=.*|ResourceDisk.MountPoint=" + self.RD_MOUNT_POINT + "|' /etc/waagent.conf"
+        if self.executor.ExecuteInBash(cmd) != CommonVariables.process_success:
+            self.logger.log(msg="Failed to change ResourceDisk.MountPoint in /etc/waagent.conf", level=CommonVariables.WarningLevel)
+            return False
+        # set ResourceDiskFormat=n to ensure waagent does not attempt a simultaneous format
+        cmd = "sed -i.rdbak2 's|ResourceDisk.Format=y|ResourceDisk.Format=n|' /etc/waagent.conf"
+        if self.executor.ExecuteInBash(cmd) != CommonVariables.process_success:
+            self.logger.log(msg="Failed to set ResourceDiskFormat in /etc/waagent.conf", level=CommonVariables.WarningLevel)
+            return False
+        # todo: restart waagent if necessary to ensure changes are picked up?
+        return True
+
+    def _configure_fstab(self):
+        """ remove resource disk from /etc/fstab if present """
+        cmd = "sed -i.bak '/azure_resource-part1/d' /etc/fstab"
+        if self.executor.ExecuteInBash(cmd) != CommonVariables.process_success:
+            self.logger.log(msg="Failed to configure resource disk entry of /etc/fstab", level=CommonVariables.WarningLevel)
+            return False
+        return True
+
+    def _unmount_resource_disk(self):
+        """ unmount resource disk """
+        self.disk_util.umount(self.RD_MOUNT_POINT)
+        self.disk_util.umount(CommonVariables.encryption_key_mount_point)
+        self.disk_util.umount('/mnt')
+        self._try_unmount_lxd()
+        self.disk_util.make_sure_path_exists(CommonVariables.encryption_key_mount_point)
+        self.disk_util.mount_by_label("BEK VOLUME", CommonVariables.encryption_key_mount_point, "fmask=077")
+
+    def _is_plain_mounted(self):
+        """ return true if mount point is mounted from a non-crypt layer """
+        mount_items = self.disk_util.get_mount_items()
+        for mount_item in mount_items:
+            if mount_item["dest"] == self.RD_MOUNT_POINT and not (mount_item["src"].startswith(CommonVariables.dev_mapper_root) or mount_item["src"].startswith(self.DEV_DM_PREFIX)):
+                return True
+        return False
+
+    def _is_crypt_mounted(self):
+        """ return true if mount point is already on a crypt layer """
+        mount_items = self.disk_util.get_mount_items()
+        for mount_item in mount_items:
+            if mount_item["dest"] == self.RD_MOUNT_POINT and (mount_item["src"].startswith(CommonVariables.dev_mapper_root) or mount_item["src"].startswith(self.DEV_DM_PREFIX)):
+                return True
+        return False
+
+    def _get_rd_device_mappers(self):
+        """
+        Retreive any device mapper device on the resource disk (e.g. /dev/dm-0).
+        Can't imagine why there would be multiple device mappers here, but doesn't hurt to handle the case
+        """
+        device_items = self.disk_util.get_device_items(self._get_rd_dev_path())
+        device_mappers = []
+        mapper_device_types = ["raid0", "raid1", "raid5", "raid10", "lvm", "crypt"]
+        for device_item in device_items:
+            # fstype should be crypto_LUKS
+            dev_path = self.disk_util.get_device_path(device_item.name)
+            if device_item.type in mapper_device_types:
+                device_mappers.append(device_item)
+                self.logger.log('Found device mapper: ' + dev_path, level='Info')
+        return device_mappers
+
+    def _remove_device_mappers(self):
+        """
+        Use dmsetup to remove the resource disk device mapper if it exists.
+        This is to allow us to make sure that the resource disk is not being used by anything and we can
+        safely luksFormat it.
+        """
+
+        # There could be a dependency between the
+        something_closed = True
+        while something_closed is True:
+            # The mappers might be dependant on each other, like a crypt on an LVM.
+            # Instead of trying to figure out the dependency tree we will try to close anything we can
+            # and if anything does get closed we will refresh the list of devices and try to close everything again.
+            # In effect we repeat until we either close everything or we reach a point where we can't close anything.
+            dm_items = self._get_rd_device_mappers()
+            something_closed = False
+
+            if len(dm_items) == 0:
+                self.logger.log('no resource disk device mapper found')
+            for dm_item in dm_items:
+                # try luksClose
+                cmd = 'cryptsetup luksClose ' + dm_item.name
+                if self.executor.Execute(cmd) == CommonVariables.process_success:
+                    self.logger.log('Successfully closed cryptlayer: ' + dm_item.name)
+                    something_closed = True
+                else:
+                    # try a dmsetup remove, in case its non-crypt device mapper (lvm, raid, something we don't know)
+                    cmd = 'dmsetup remove ' + self.disk_util.get_device_path(dm_item.name)
+                    if self.executor.Execute(cmd) == CommonVariables.process_success:
+                        something_closed = True
+                    else:
+                        self.logger.log('failed to remove ' + dm_item.name)
+
+    def _prepare_partition(self):
+        """ create partition on resource disk if missing """
+        if self._resource_disk_partition_exists():
+            return True
+        self.logger.log("resource disk partition does not exist", level='Info')
+        cmd = 'parted ' + self._get_rd_base_dev_path() + ' mkpart primary ext4 0% 100%'
+        if self.executor.ExecuteInBash(cmd) == CommonVariables.process_success:
+            # wait for the corresponding udev name to become available
+            for i in range(0, 10):
+                time.sleep(i)
+                if self._resource_disk_partition_exists():
+                    return True
+        self.logger.log('unable to make resource disk partition')
+        return False
+
+    def _wipe_partition_header(self):
+        """ clear any possible header (luke or filesystem) by overwriting with 10MB of entropy """
+        if not self._resource_disk_partition_exists():
+            self.logger.log("resource partition does not exist, no header to clear")
+            return True
+        cmd = 'dd if=/dev/urandom of=' + self._get_rd_dev_path() + ' bs=512 count=20480'
+        return self.executor.Execute(cmd) == CommonVariables.process_success
+
+    def _try_unmount_lxd(self):
+        if bool(self.executor.Execute('test -f /run/snapd/ns/lxd.mnt', False, None, None, True) == 0):
+            self.logger.log('/run/snapd/ns/lxd.mnt found, try umount /mnt from lxd namespace')
+            return bool(self.executor.Execute('nsenter --mount=/run/snapd/ns/lxd.mnt umount /mnt', False, None, None, False) == 0)
+        else:
+            # nothing to unmount
+            return True
+
+    def _get_rd_fstab_details(self):
+        fstab_location = "/etc/fstab"
+        rd_dev_paths = ["{0}-part1".format(path) for path in self.dev_path_options if os.path.exists(path)]
+        if os.path.exists(fstab_location):
+            with open('/etc/fstab', 'r') as f:
+                lines = f.readlines()
+            for i in range(len(lines)):
+                line = lines[i]                 
+                device, mountpoint, fs, opts = self.crypt_mount_config_util.parse_fstab_line(line)
+                if device in rd_dev_paths or device == "/dev/mapper/resourceencrypt":
+                    self.logger.log("resource disk fstab details- {0}, {1}, {2}, {3}".format(device,mountpoint,fs,opts))
+                    return device,mountpoint,fs,opts
+        return None,None,None,None
+
+
+    def try_remount(self):
+        """ mount the resource disk if not already mounted"""
+        self.logger.log("In try_remount")
+
+        if self.passphrase_filename:
+            self.logger.log("passphrase_filename(value={0}) is not null, so trying to mount encrypted Resource Disk".format(self.passphrase_filename))
+
+            if self._is_crypt_mounted():
+                self.logger.log("Resource disk already encrypted and mounted")
+                # Add resource disk to crypttab if crypt mount is used
+                # Scenario: RD is alreday crypt mounted and crypt mount to crypttab migration is initiated
+                if self.crypt_mount_config_util.should_use_azure_crypt_mount():
+                    self.add_resource_disk_to_crypttab()
+                return True
+
+            if self._resource_disk_partition_exists() and self._is_luks_device():
+                self.disk_util.luks_open(passphrase_file=self.passphrase_filename, dev_path=self._get_rd_dev_path(), mapper_name=self.RD_MAPPER_NAME, header_file=None, uses_cleartext_key=False)
+                self.logger.log("Trying to mount resource disk.")
+                mount_retval = self._mount_resource_disk(self.RD_MAPPER_PATH)
+                if mount_retval:
+                    # We successfully mounted the RD but
+                    # the RD was not auto-mounted, so trying to enable auto-unlock for RD
+                    self.add_resource_disk_to_crypttab()
+                return mount_retval
+        else:
+            self.logger.log("passphrase_filename(value={0}) is null, so trying to mount plain Resource Disk".format(self.passphrase_filename))
+            if self._is_plain_mounted():
+                self.logger.log("Resource disk already encrypted and mounted")
+                return True
+            return self._mount_resource_disk(self._get_rd_dev_path())
+
+        # conditions required to re-mount were not met
+        return False
+
+    def prepare(self):
+        """ prepare a non-encrypted resource disk to be encrypted """
+        self._configure_waagent()
+        self._configure_fstab()
+        if self._resource_disk_partition_exists():
+            self.disk_util.swapoff()
+            self._unmount_resource_disk()
+            self._remove_device_mappers()
+            self._wipe_partition_header()
+        self._prepare_partition()
+        return True
+
+    def add_to_fstab(self):
+        with open("/etc/fstab") as f:
+            lines = f.readlines()
+
+        if not self.crypt_mount_config_util.is_bek_in_fstab_file(lines):
+            lines.append(self.crypt_mount_config_util.get_fstab_bek_line())
+            self.crypt_mount_config_util.add_bek_to_default_cryptdisks()
+
+        if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
+            if self.distro_info[0].lower() == 'ubuntu' and self.distro_info[1].startswith('14'):
+                lines.append('{0} {1} auto defaults,discard,nobootwait 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+            else:
+                lines.append('{0} {1} auto defaults,discard,nofail 0 0\n'.format(self.RD_MAPPER_PATH, self.RD_MOUNT_POINT))
+
+        with open('/etc/fstab', 'w') as f:
+            f.writelines(lines)
+
+    def encrypt_format_mount(self):
+        if self._resource_disk_exists():
+            if not self.prepare():
+                self.logger.log("Failed to prepare VM for Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            if not self._encrypt():
+                self.logger.log("Failed to encrypt Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            if not self._format_encrypted_partition():
+                self.logger.log("Failed to format the encrypted Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            if not self._mount_resource_disk(self.RD_MAPPER_PATH):
+                self.logger.log("Failed to mount after formatting and encrypting the Resource Disk Encryption", CommonVariables.ErrorLevel)
+                return False
+            # We haven't failed so far, lets just add the RD to crypttab
+            self.add_resource_disk_to_crypttab()
+        return True
+
+    def add_resource_disk_to_crypttab(self):
+        self.logger.log("Adding resource disk to the crypttab file")
+        crypt_item = CryptItem()
+        crypt_item.dev_path = self._get_rd_dev_path()
+        crypt_item.mapper_name = self.RD_MAPPER_NAME
+        crypt_item.uses_cleartext_key = False
+        crypt_item.mount_point = self.RD_MOUNT_POINT
+        if self.passphrase_filename != None:
+            crypt_item.keyfile_path = self.passphrase_filename
+        self.crypt_mount_config_util.remove_crypt_item(crypt_item)  # Remove old item in case it was already there
+        self.add_to_fstab()
+        backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+        self.crypt_mount_config_util.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
+        #self.add_to_fstab()
+
+    def automount(self,encrypt_format_device=False):
+        """
+        Mount the resource disk (encrypted or not)
+        or
+        encrypt the resource disk and mount it if enable was called with EFA
+        or if encrypt format device is set to True.
+        If False is returned, the resource disk is not mounted.
+        """
+        # try to remount if the disk was previously encrypted and is still valid
+        if self.try_remount():
+            return True
+        # unencrypted or unusable
+        elif self._is_encrypt_format_all() or \
+             encrypt_format_device:
+            return self.encrypt_format_mount()
+        else:
+            self.logger.log('EncryptionFormatAll not in use, resource disk will not be automatically formatted and encrypted.')
+
+        return self._is_crypt_mounted() or self._is_plain_mounted()
+
+    def encrypt_resource_disk(self):
+        if self._is_crypt_mounted():
+            return True
+        else:
+            return self.encrypt_format_mount()

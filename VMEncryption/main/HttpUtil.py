@@ -1,0 +1,87 @@
+#!/usr/bin/env python
+#
+# Azure Disk Encryption For Linux extension
+#
+# Copyright 2016 Microsoft Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import time
+import datetime
+import traceback
+import shlex
+import subprocess
+from Common import CommonVariables
+from subprocess import *
+# waagentloader is a python3+ compatible loader embedded in this extension, cloned from VMAccess
+from Utils.waagentloader import load_waagent  
+try:
+    from urllib.parse import urlparse #python3+
+except ImportError:
+    from urlparse import urlparse #python2
+try:
+    import http.client as httpclient #python3+
+except ImportError:
+    import httplib as httpclient #python2
+
+class HttpUtil(object):
+    """description of class"""
+    def __init__(self, logger):
+        self.logger = logger
+        waagent = load_waagent()
+        try:
+            waagent.MyDistro = waagent.GetMyDistro()
+            Config = waagent.ConfigurationProvider(None)
+        except Exception as e:
+            errorMsg = "Failed to construct ConfigurationProvider, which may due to the old wala code."
+            self.logger.log(errorMsg)
+            Config = waagent.ConfigurationProvider()
+        self.proxyHost = Config.get("HttpProxy.Host")
+        self.proxyPort = Config.get("HttpProxy.Port")
+        self.connection = None
+
+    """
+    snapshot also called this. so we should not write the file/read the file in this method.
+    """
+
+    def Call(self, method, http_uri, data, headers, use_https=True, noProxy=False):
+        try:
+            uri_obj = urlparse(http_uri)
+            #parse the uri str here
+            if self.proxyHost is None or self.proxyPort is None or noProxy==True:
+                if use_https:
+                    self.connection = httpclient.HTTPSConnection(uri_obj.hostname, timeout=60)
+                else:
+                    self.connection = httpclient.HTTPConnection(uri_obj.hostname, timeout=60)
+                if uri_obj.query is not None:
+                    self.connection.request(method=method, url=(uri_obj.path +'?'+ uri_obj.query), body=data, headers=headers)
+                else:
+                    self.connection.request(method=method, url=(uri_obj.path), body=data, headers=headers)
+                resp = self.connection.getresponse()
+            else:
+                self.logger.log("proxyHost is not empty, so use the proxy to call the http.")
+                if use_https:
+                    self.connection = httpclient.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=60)
+                else:
+                    self.connection = httpclient.HTTPSConnection(self.proxyHost, self.proxyPort, timeout=60)
+                if uri_obj.scheme.lower() == "https":
+                    self.connection.set_tunnel(uri_obj.hostname, 443)
+                else:
+                    self.connection.set_tunnel(uri_obj.hostname, 80)
+                self.connection.request(method=method, url=(http_uri), body=data, headers=headers)
+                resp = self.connection.getresponse()
+            return resp
+        except Exception as e:
+            errorMsg = "Failed to call http with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
+            self.logger.log(errorMsg)
+            return None
