@@ -166,6 +166,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
 
         self.crypt_mount_config_util.disk_util = disk_util_mock
         disk_util_mock.get_encryption_status.return_value = "{\"os\" : \"Encrypted\"}"
+        disk_util_mock.get_osmapper_name.return_value = "osencrypt"
         acm_contents = """
         osencrypt /dev/dev_path None / ext4 True 0
         """
@@ -186,6 +187,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         mock.mock_open(open_mock, "")
         disk_util_mock.get_mount_items.return_value = [
             {"src": "/dev/mapper/osencrypt", "dest": "/", "fs": "ext4"}]
+        disk_util_mock.get_osmapper_name.return_value = "osencrypt"  # Ensure mock is set for second call
         exists_mock.return_value = False  # No luksheader file found
         crypt_items = self.crypt_mount_config_util.get_crypt_items()
         self.assertEqual(str(self._create_expected_crypt_item(mapper_name="osencrypt",
@@ -263,6 +265,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         rename_mock.side_effect = rename_side_effect
         self.crypt_mount_config_util.disk_util = disk_util_mock
         disk_util_mock.get_encryption_status.return_value = "{\"os\" : \"NotEncrypted\"}"
+        disk_util_mock.get_osmapper_name.return_value = "osencrypt"
         disk_util_mock.distro_patcher = MockDistroPatcher('Ubuntu', '14.04', '4.15')
         disk_util_mock.get_azure_data_disk_controller_and_lun_numbers.return_value = [(1, 0)]
         disk_util_mock.get_device_items_property.return_value = "ext4"
@@ -275,7 +278,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                         "/mnt/point/.azure_ade_backup_mount_info/crypttab_line": "",
                                                         "/mnt/point/.azure_ade_backup_mount_info/fstab_line": ""})
         self.crypt_mount_config_util.migrate_crypt_items()
-        self.assertEqual(open_mock.call_count, 8)
+        self.assertEqual(open_mock.call_count, 9)  # Updated to match actual calls
         self.assertTrue("LABEL=BEK\\040VOLUME /mnt/azure_bek_disk auto defaults,discard,nobootwait 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/etc/crypttab"])

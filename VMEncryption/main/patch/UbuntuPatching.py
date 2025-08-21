@@ -57,7 +57,7 @@ class UbuntuPatching(AbstractPatching):
             cmd = "dpkg-query -s {package} | grep -q 'install ok installed'"
             if not self.command_executor.ExecuteInBash(cmd, False, None, None, True):
                 installed = False
-                self.logger.log("{1} package not yet installed".format(package))
+                self.logger.log("{0} package not yet installed".format(package))
         return installed
 
     def install_azguestattestation(self):
