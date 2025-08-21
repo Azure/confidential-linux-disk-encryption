@@ -7,6 +7,9 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 # Get the main directory (parent of test directory)
 _MAIN_DIR = os.path.dirname(_THIS_DIR)
 
+# Add the test directory itself to Python path for console_logger.py
+sys.path.insert(0, _THIS_DIR)
+
 # Add the main directory to Python path so we can import modules
 sys.path.insert(0, _MAIN_DIR)
 
@@ -24,6 +27,7 @@ sys.path.insert(0, _SINGLEPASS_DIR)
 
 # Print debug info to help troubleshoot import issues
 print(f"conftest.py: Added to sys.path:")
+print(f"  Test dir: {_THIS_DIR}")
 print(f"  Main dir: {_MAIN_DIR}")
 print(f"  VMEncryption dir: {_VM_ENCRYPTION_DIR}")
 print(f"  Utils dir: {_UTILS_DIR}")
