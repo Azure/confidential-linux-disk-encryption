@@ -55,12 +55,30 @@ jobs:
         echo "=== Running Utils tests (Python 3 compatible only) ==="
         python -m pytest test/test_logutil.py -v || echo "Utils tests skipped"
 
-    - name: Upload coverage to Codecov
+    - name: Generate coverage summary for GitHub
       if: matrix.python-version == '3.11'
-      uses: codecov/codecov-action@v3
+      working-directory: VMEncryption/main
+      run: |
+        if [ -f "coverage.xml" ]; then
+          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          coverage report --format=markdown >> $GITHUB_STEP_SUMMARY 2>/dev/null || \
+          (echo "\`\`\`" >> $GITHUB_STEP_SUMMARY && \
+           coverage report >> $GITHUB_STEP_SUMMARY 2>/dev/null && \
+           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY) || \
+          echo "Coverage data collected but report generation failed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "No coverage data available" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload coverage as GitHub artifact
+      if: matrix.python-version == '3.11'
+      uses: actions/upload-artifact@v4
       with:
-        file: ./VMEncryption/main/coverage.xml
-        fail_ci_if_error: false
+        name: coverage-report
+        path: VMEncryption/main/coverage.xml
+        if-no-files-found: warn
 
     - name: Basic syntax check
       if: matrix.python-version == '3.11'
