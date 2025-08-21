@@ -5,11 +5,13 @@ on:
     branches: [ "*" ]  # Run on all branch pushes
   pull_request:
     branches: [ "main", "master", "dev", "develop" ]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false  # Skip draft PRs
     strategy:
       matrix:
         python-version: ["3.8", "3.11"]  # Test on minimum and recommended versions
@@ -79,6 +81,15 @@ jobs:
         name: coverage-report
         path: VMEncryption/main/coverage.xml
         if-no-files-found: warn
+
+    - name: Test completion status
+      if: matrix.python-version == '3.11'
+      run: |
+        echo "## ✅ Unit Tests Completed" >> $GITHUB_STEP_SUMMARY
+        echo "All unit tests have been executed." >> $GITHUB_STEP_SUMMARY
+        echo "- VMEncryption tests: Completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Utils tests: Completed (waagent-dependent tests skipped)" >> $GITHUB_STEP_SUMMARY
+        echo "- Coverage: Generated and uploaded" >> $GITHUB_STEP_SUMMARY
 
     - name: Basic syntax check
       if: matrix.python-version == '3.11'
