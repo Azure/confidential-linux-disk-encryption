@@ -340,7 +340,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                         "/mnt/point2/.azure_ade_backup_mount_info/crypttab_line": "",
                                                         "/mnt/point2/.azure_ade_backup_mount_info/fstab_line": ""})
         self.crypt_mount_config_util.migrate_crypt_items()
-        self.assertEqual(open_mock.call_count, 13)
+        self.assertEqual(open_mock.call_count, 15)
         self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0\n" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("\nmapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0" in open_mock.content_dict["/etc/crypttab"])
