@@ -169,9 +169,15 @@ class ExtensionParameter(object):
         if a:
             if a[-1] == '/': a = a[:-1]
             a = a.lower()
+            # Remove default HTTPS port 443 if present
+            if ':443' in a and a.startswith('https://'):
+                a = a.replace(':443', '')
         if b:
             b = b.lower()
             if b[-1] == '/': b = b[:-1]
+            # Remove default HTTPS port 443 if present
+            if ':443' in b and b.startswith('https://'):
+                b = b.replace(':443', '')
         return a==b
 
     def config_changed(self):

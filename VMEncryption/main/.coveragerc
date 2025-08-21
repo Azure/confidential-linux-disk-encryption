@@ -1,0 +1,48 @@
+[run]
+source = .
+omit = 
+    # Exclude __init__.py files
+    */__init__.py
+    __init__.py
+
+    # Exclude test files from coverage
+    test/*
+    tests/*
+    *test*.py
+
+    # Exclude specific directories with 0% coverage
+    oscrypto/*
+    */oscrypto/*
+
+    # Exclude external utilities and waagent
+    Utils/waagent
+    */Utils/waagent
+
+    # Exclude state machine files (0% coverage)
+    */encryptstates/*
+    *StateMachine.py
+    OSEncryptionState*.py
+
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if __name__ == .__main__.:
+
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+
+[html]
+directory = htmlcov

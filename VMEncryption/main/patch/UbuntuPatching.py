@@ -57,7 +57,7 @@ class UbuntuPatching(AbstractPatching):
             cmd = "dpkg-query -s {package} | grep -q 'install ok installed'"
             if not self.command_executor.ExecuteInBash(cmd, False, None, None, True):
                 installed = False
-                self.logger.log("{1} package not yet installed".format(package))
+                self.logger.log("{0} package not yet installed".format(package))
         return installed
 
     def install_azguestattestation(self):
@@ -227,7 +227,7 @@ class UbuntuPatching(AbstractPatching):
         # - remove the 40-force-partuuid.cfg file added by cloudinit, since it references the old boot partition
         # - set grub cmdline to use root=/dev/mapper/osencrypt
         self.command_executor.Execute("rm -f /etc/default/grub.d/40-force-partuuid.cfg", True)
-        self.command_executor.Execute("sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"root=\/dev\/mapper\/osencrypt /g' /etc/default/grub", True)
+        self.command_executor.Execute(r"sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"root=\/dev\/mapper\/osencrypt /g' /etc/default/grub", True)
 
         # now update grub and re-install
         self.command_executor.Execute('update-grub', True)

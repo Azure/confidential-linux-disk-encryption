@@ -17,7 +17,13 @@
 # limitations under the License.
 
 import os.path
-import fcntl
+try:
+    import fcntl
+    FCNTL_AVAILABLE = True
+except ImportError:
+    # fcntl is not available on Windows
+    FCNTL_AVAILABLE = False
+    
 from Common import CommonVariables
 
 
@@ -28,6 +34,10 @@ class ProcessLock(object):
         self.fd = None
 
     def try_lock(self):
+        if not FCNTL_AVAILABLE:
+            self.logger.log("fcntl not available (likely Windows environment), skipping file locking")
+            return True
+            
         try:
             self.fd = open(self.lock_file_path, "w") 
             fcntl.flock(self.fd, fcntl.LOCK_EX)
@@ -38,5 +48,8 @@ class ProcessLock(object):
             return False
 
     def release_lock(self):
+        if not FCNTL_AVAILABLE or self.fd is None:
+            return
+            
         fcntl.flock(self.fd, fcntl.LOCK_UN)
         self.fd.close()
