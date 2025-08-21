@@ -227,7 +227,7 @@ class UbuntuPatching(AbstractPatching):
         # - remove the 40-force-partuuid.cfg file added by cloudinit, since it references the old boot partition
         # - set grub cmdline to use root=/dev/mapper/osencrypt
         self.command_executor.Execute("rm -f /etc/default/grub.d/40-force-partuuid.cfg", True)
-        self.command_executor.Execute("sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"root=\/dev\/mapper\/osencrypt /g' /etc/default/grub", True)
+        self.command_executor.Execute(r"sed -i 's/GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"root=\/dev\/mapper\/osencrypt /g' /etc/default/grub", True)
 
         # now update grub and re-install
         self.command_executor.Execute('update-grub', True)
