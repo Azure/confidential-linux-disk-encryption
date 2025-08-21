@@ -18,17 +18,6 @@ omit =
     Utils/waagent
     */Utils/waagent
 
-    # Exclude specific files with very low coverage
-    handle.py
-    */handle.py
-    OnlineEncryptionHandler.py
-    OnlineEncryptionResumer.py
-    VolumeNotificationService.py
-    HttpUtil.py
-    MachineIdentity.py
-    BackupLogger.py
-    BuildVersion.py
-
     # Exclude state machine files (0% coverage)
     */encryptstates/*
     *StateMachine.py
