@@ -4,7 +4,8 @@ from Common import CryptItem
 from EncryptionEnvironment import EncryptionEnvironment
 from CryptMountConfigUtil import CryptMountConfigUtil
 from console_logger import ConsoleLogger
-from .test_utils import MockDistroPatcher
+from test_utils import MockDistroPatcher
+import platform
 
 try:
     import unittest.mock as mock  # python3+
@@ -281,9 +282,25 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertEqual(open_mock.call_count, 9)  # Updated to match actual calls
         self.assertTrue("LABEL=BEK\\040VOLUME /mnt/azure_bek_disk auto defaults,discard,nobootwait 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
-        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/etc/crypttab"])
-        self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
-        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
+        
+        # Handle cross-platform path separators
+        if platform.system() == 'Windows':
+            expected_crypttab_line = "mapper_name /dev/dev_path /mnt/azure_bek_disk\\LinuxPassPhraseFileName_1_0 luks,nofail"
+        else:
+            expected_crypttab_line = "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        
+        self.assertTrue(expected_crypttab_line in open_mock.content_dict["/etc/crypttab"])
+        
+        # Handle cross-platform path separators for backup info paths
+        if platform.system() == 'Windows':
+            fstab_backup_path = "/mnt/point\\.azure_ade_backup_mount_info/fstab_line"
+            crypttab_backup_path = "/mnt/point\\.azure_ade_backup_mount_info/crypttab_line"
+        else:
+            fstab_backup_path = "/mnt/point/.azure_ade_backup_mount_info/fstab_line"
+            crypttab_backup_path = "/mnt/point/.azure_ade_backup_mount_info/crypttab_line"
+            
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict[fstab_backup_path])
+        self.assertTrue(expected_crypttab_line in open_mock.content_dict[crypttab_backup_path])
 
         # Test 2: migrate an entry (BEK in fstab)
         open_mock.reset_mock()
@@ -298,9 +315,18 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.crypt_mount_config_util.migrate_crypt_items()
         self.assertEqual(open_mock.call_count, 8)
         self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
-        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/etc/crypttab"])
-        self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
-        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
+        
+        # Handle cross-platform path separators for Test 2
+        if platform.system() == 'Windows':
+            expected_crypttab_line_test2 = "mapper_name /dev/dev_path /mnt/azure_bek_disk\\LinuxPassPhraseFileName_1_0 luks,nofail"
+        else:
+            expected_crypttab_line_test2 = "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+        
+        self.assertTrue(expected_crypttab_line_test2 in open_mock.content_dict["/etc/crypttab"])
+        
+        # Use the same path separator handling for Test 2 backup paths
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point" in open_mock.content_dict[fstab_backup_path])
+        self.assertTrue(expected_crypttab_line_test2 in open_mock.content_dict[crypttab_backup_path])
 
         # Test 3: migrate no entry
         open_mock.reset_mock()
@@ -343,12 +369,38 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertEqual(open_mock.call_count, 15)
         self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
         self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 auto defaults,nofail,discard 0 0" in open_mock.content_dict["/etc/fstab"])
-        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0" in open_mock.content_dict["/etc/crypttab"])
-        self.assertTrue("mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0" in open_mock.content_dict["/etc/crypttab"])
-        self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
-        self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
-        self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 auto defaults,nofail,discard 0 0" in open_mock.content_dict["/mnt/point2/.azure_ade_backup_mount_info/fstab_line"])
-        self.assertTrue("mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" in open_mock.content_dict["/mnt/point2/.azure_ade_backup_mount_info/crypttab_line"])
+        
+        # Handle cross-platform path separators for Test 5
+        if platform.system() == 'Windows':
+            expected_crypttab_test5_1 = "mapper_name /dev/dev_path /mnt/azure_bek_disk\\LinuxPassPhraseFileName_1_0"
+            expected_crypttab_test5_2 = "mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk\\LinuxPassPhraseFileName_1_0"
+            backup_fstab_path_1 = "/mnt/point\\.azure_ade_backup_mount_info/fstab_line"
+            backup_crypttab_path_1 = "/mnt/point\\.azure_ade_backup_mount_info/crypttab_line"
+            expected_backup_crypttab_1 = "mapper_name /dev/dev_path /mnt/azure_bek_disk\\LinuxPassPhraseFileName_1_0 luks,nofail"
+        else:
+            expected_crypttab_test5_1 = "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0"
+            expected_crypttab_test5_2 = "mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0"
+            backup_fstab_path_1 = "/mnt/point/.azure_ade_backup_mount_info/fstab_line"
+            backup_crypttab_path_1 = "/mnt/point/.azure_ade_backup_mount_info/crypttab_line"
+            expected_backup_crypttab_1 = "mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+            
+        self.assertTrue(expected_crypttab_test5_1 in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue(expected_crypttab_test5_2 in open_mock.content_dict["/etc/crypttab"])
+        self.assertTrue("/dev/mapper/mapper_name /mnt/point auto defaults,nofail,discard 0 0" in open_mock.content_dict[backup_fstab_path_1])
+        self.assertTrue(expected_backup_crypttab_1 in open_mock.content_dict[backup_crypttab_path_1])
+        
+        # Handle cross-platform paths for the second backup location
+        if platform.system() == 'Windows':
+            backup_fstab_path_2 = "/mnt/point2\\.azure_ade_backup_mount_info/fstab_line"
+            backup_crypttab_path_2 = "/mnt/point2\\.azure_ade_backup_mount_info/crypttab_line"
+            expected_backup_crypttab_2 = "mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk\\LinuxPassPhraseFileName_1_0 luks,nofail"
+        else:
+            backup_fstab_path_2 = "/mnt/point2/.azure_ade_backup_mount_info/fstab_line"
+            backup_crypttab_path_2 = "/mnt/point2/.azure_ade_backup_mount_info/crypttab_line"
+            expected_backup_crypttab_2 = "mapper_name2 /dev/dev_path2 /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail"
+            
+        self.assertTrue("/dev/mapper/mapper_name2 /mnt/point2 auto defaults,nofail,discard 0 0" in open_mock.content_dict[backup_fstab_path_2])
+        self.assertTrue(expected_backup_crypttab_2 in open_mock.content_dict[backup_crypttab_path_2])
 
         # Test 6: skip if filesystem not supported
         open_mock.reset_mock()

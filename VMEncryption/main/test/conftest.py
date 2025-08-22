@@ -1,5 +1,14 @@
 import sys
 import os
+from unittest.mock import Mock
+
+# Mock problematic modules before any other imports
+sys.modules['xml'] = Mock()
+sys.modules['xml.parsers'] = Mock()
+sys.modules['xml.parsers.expat'] = Mock()
+sys.modules['xml.etree'] = Mock()
+sys.modules['xml.etree.ElementTree'] = Mock()
+sys.modules['waagent'] = Mock()
 
 # Get the directory containing this conftest.py file
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
