@@ -8,7 +8,9 @@ from unittest.mock import Mock, patch, MagicMock, call
 # Add the parent directory to the path to allow imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import handle
+# Mock the waagent loading to avoid Windows compatibility issues
+with patch('sys.modules', {'waagent': Mock()}):
+    import handle
 from Common import CommonVariables
 
 
