@@ -3,6 +3,22 @@
 import unittest
 import sys
 import os
+from unittest.mock import Mock, patch, MagicMock
+
+# Add the parent directory to the path to allow imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Mock the problematic imports before importing handle
+sys.modules['Utils'] = Mock()
+sys.modules['Utils.HandlerUtil'] = Mock()
+sys.modules['waagent'] = Mock()
+
+# Mock the waagent loading to avoid Windows compatibility issues
+with patch('sys.modules', {**sys.modules, 'waagent': Mock()}):
+    import handle
+
+from Common import CommonVariables
+import os
 from unittest.mock import Mock, patch, MagicMock, call
 
 # Add the parent directory to the path to allow imports

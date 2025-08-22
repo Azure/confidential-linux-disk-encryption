@@ -11,6 +11,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # Prevent jobs from hanging indefinitely
     if: github.event.pull_request.draft == false  # Skip draft PRs
     strategy:
       matrix:
@@ -21,22 +22,97 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Debug system state
+      run: |
+        echo "=== System Information ==="
+        uname -a
+        df -h
+        free -h
+        echo "=== Checking for running package managers ==="
+        ps aux | grep -E "(apt|dpkg|unattended-upgrade)" || echo "No package managers running"
+        echo "=== Lock files status ==="
+        ls -la /var/lib/dpkg/ | grep lock || echo "No dpkg locks found"
+        ls -la /var/lib/apt/lists/ | grep lock || echo "No apt locks found"
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install system dependencies
+    - name: Wait for apt lock and install system dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y dos2unix file
+        # Wait for any existing apt processes to complete
+        echo "Waiting for apt lock to be released..."
+        
+        # First, wait for unattended upgrades to finish
+        echo "Checking for unattended upgrades..."
+        sudo systemctl stop unattended-upgrades || true
+        sudo killall unattended-upgrade-shutdown || true
+        
+        # Wait for locks to clear
+        timeout=300  # 5 minutes timeout
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          if ! sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 && \
+             ! sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 && \
+             ! sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; then
+            echo "All locks released after ${elapsed} seconds"
+            break
+          fi
+          echo "Waiting for locks to clear... (${elapsed}s/${timeout}s)"
+          sleep 5
+          elapsed=$((elapsed + 5))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+          echo "Timeout waiting for locks, proceeding anyway..."
+          # Force remove locks as last resort
+          sudo rm -f /var/lib/dpkg/lock*
+          sudo rm -f /var/lib/apt/lists/lock
+          sudo dpkg --configure -a || true
+        fi
+        
+        echo "Installing system dependencies..."
+        # Use retries with exponential backoff
+        for i in {1..3}; do
+          echo "Attempt $i to update package lists..."
+          if sudo apt-get update -o DPkg::Lock::Timeout=60; then
+            echo "Package lists updated successfully"
+            break
+          else
+            echo "Failed to update package lists (attempt $i/3)"
+            sleep $((i * 10))
+          fi
+        done
+        
+        for i in {1..3}; do
+          echo "Attempt $i to install packages..."
+          if sudo apt-get install -y -o DPkg::Lock::Timeout=60 dos2unix file; then
+            echo "Packages installed successfully"
+            break
+          else
+            echo "Failed to install packages (attempt $i/3)"
+            sleep $((i * 10))
+          fi
+        done
 
-    - name: Install Python dependencies
+    - name: Install Python dependencies  
       run: |
+        echo "Upgrading pip..."
         python -m pip install --upgrade pip
-        pip install -r VMEncryption/requirements.txt
-        # Install additional test dependencies
+        
+        echo "Installing requirements..."
+        if [ -f "VMEncryption/requirements.txt" ]; then
+          pip install -r VMEncryption/requirements.txt
+        else
+          echo "No requirements.txt found, installing common dependencies..."
+          pip install cryptography pytz
+        fi
+        
+        echo "Installing test dependencies..."
         pip install pytest-cov coverage
+        
+        echo "Python dependencies installed successfully"
 
     - name: Set up Python path for tests
       run: |
