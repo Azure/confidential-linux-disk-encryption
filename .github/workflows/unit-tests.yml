@@ -2,7 +2,7 @@ name: Unit Tests
 
 on:
   push:
-    branches: [ "*" ]  # Run on all branch pushes
+    branches: [ "main", "master", "dev", "develop" ]  # Only run on main branches
   pull_request:
     branches: [ "main", "master", "dev", "develop" ]
     types: [opened, synchronize, reopened, ready_for_review]
