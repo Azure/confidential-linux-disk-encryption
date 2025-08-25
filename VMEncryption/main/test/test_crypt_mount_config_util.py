@@ -31,12 +31,16 @@ class Test_crypt_mount_config_util(unittest.TestCase):
 
             def write_handle(data, *args, **kwargs):
                 if 'a' in mode:
+                    if filename not in open_mock.content_dict:
+                        open_mock.content_dict[filename] = ""
                     open_mock.content_dict[filename] += data
                 else:
                     open_mock.content_dict[filename] = data
 
             def write_lines_handle(data, *args, **kwargs):
                 if 'a' in mode:
+                    if filename not in open_mock.content_dict:
+                        open_mock.content_dict[filename] = ""
                     open_mock.content_dict[filename] += "".join(data)
                 else:
                     open_mock.content_dict[filename] = "".join(data)
