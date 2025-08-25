@@ -102,3 +102,4 @@ VMEncryption/AzureDiskEncryptionForLinux*.xml
 VMEncryption/ADEForLinux*.xml
 VMEncryption/MANIFEST
 
+.aidetector.json

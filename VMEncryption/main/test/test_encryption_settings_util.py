@@ -11,7 +11,8 @@ except ImportError:
     import mock # python2
 
 # Mock XML modules to avoid import issues
-sys.modules['xml'] = mock.MagicMock()
+# Note: Don't mock xml module as it's needed for MachineIdentity tests
+# sys.modules['xml'] = mock.MagicMock()  # Commented out - needed for XML parsing
 sys.modules['xml.etree'] = mock.MagicMock()
 sys.modules['xml.etree.ElementTree'] = mock.MagicMock()
 

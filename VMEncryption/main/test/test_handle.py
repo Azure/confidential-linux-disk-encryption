@@ -12,12 +12,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.modules['Utils'] = Mock()
 sys.modules['Utils.HandlerUtil'] = Mock()
 sys.modules['waagent'] = Mock()
-sys.modules['xml'] = Mock()
-sys.modules['xml.parsers'] = Mock()
-sys.modules['xml.parsers.expat'] = Mock()
+# sys.modules['xml'] = Mock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers'] = Mock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers.expat'] = Mock()  # Commented out - needed for XML parsing
 
 # Mock the waagent loading to avoid Windows compatibility issues
-with patch('sys.modules', {**sys.modules, 'waagent': Mock(), 'xml': Mock(), 'xml.parsers': Mock(), 'xml.parsers.expat': Mock()}):
+with patch('sys.modules', {**sys.modules, 'waagent': Mock()}):  # Removed XML mocks
     import handle
 
 from Common import CommonVariables

@@ -3,9 +3,9 @@ import os
 from unittest.mock import Mock
 
 # Mock problematic modules before any other imports
-sys.modules['xml'] = Mock()
-sys.modules['xml.parsers'] = Mock()
-sys.modules['xml.parsers.expat'] = Mock()
+# Note: Don't mock xml module or its parsers as they're needed for MachineIdentity tests
+# sys.modules['xml.parsers'] = Mock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers.expat'] = Mock()  # Commented out - needed for XML parsing
 sys.modules['xml.etree'] = Mock()
 sys.modules['xml.etree.ElementTree'] = Mock()
 sys.modules['waagent'] = Mock()

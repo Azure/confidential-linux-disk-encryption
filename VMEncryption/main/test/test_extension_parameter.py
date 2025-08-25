@@ -34,9 +34,9 @@ except ImportError:
 sys.modules['Utils'] = mock.MagicMock()
 sys.modules['Utils.waagentloader'] = mock.MagicMock()
 sys.modules['waagent'] = mock.MagicMock()
-sys.modules['xml'] = mock.MagicMock()
-sys.modules['xml.parsers'] = mock.MagicMock()
-sys.modules['xml.parsers.expat'] = mock.MagicMock()
+# sys.modules['xml'] = mock.MagicMock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers'] = mock.MagicMock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers.expat'] = mock.MagicMock()  # Commented out - needed for XML parsing
 sys.modules['xml.etree'] = mock.MagicMock()
 sys.modules['xml.etree.ElementTree'] = mock.MagicMock()
 sys.modules['xml.etree.ElementPath'] = mock.MagicMock()
