@@ -55,15 +55,17 @@ Example Status Report:
 import os
 import os.path
 import sys
-import imp
+import importlib.util
 import base64
 import json
 import time
 
 from xml.etree import ElementTree
 from os.path import join
-from Utils.WAAgentUtil import waagent
-from waagent import LoggerInit
+from WAAgentUtil import waagent
+
+# Get LoggerInit from the loaded waagent module
+LoggerInit = getattr(waagent, 'LoggerInit', lambda *args: None)
 
 DateTimeFormat = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -159,8 +161,8 @@ class HandlerUtility:
             self.error("JSON error processing settings file:" + ctxt)
         else:
             handlerSettings = config['runtimeSettings'][0]['handlerSettings']
-            if handlerSettings.has_key('protectedSettings') and \
-                    handlerSettings.has_key("protectedSettingsCertThumbprint") and \
+            if 'protectedSettings' in handlerSettings and \
+                    "protectedSettingsCertThumbprint" in handlerSettings and \
                     handlerSettings['protectedSettings'] is not None and \
                     handlerSettings["protectedSettingsCertThumbprint"] is not None:
                 protectedSettings = handlerSettings['protectedSettings']

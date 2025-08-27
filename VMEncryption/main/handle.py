@@ -56,6 +56,18 @@ from OnlineEncryptionHandler import OnlineEncryptionHandler
 from VolumeNotificationService import VolumeNotificationService
 from io import open
 
+# Global variables
+hutil = None
+logger = None
+DistroPatcher = None
+encryption_environment = None
+security_Type = None
+vns_call = None
+DistroPatcher = None
+encryption_environment = None
+security_Type = None
+vns_call = None
+
 
 def install():
     hutil.do_parse_context('Install')
