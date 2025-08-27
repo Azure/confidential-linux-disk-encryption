@@ -10,12 +10,11 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30  # Prevent jobs from hanging indefinitely
     if: github.event.pull_request.draft == false  # Skip draft PRs
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
         python-version: ["3.8", "3.11"]  # Test on minimum and recommended versions
 
     steps:
@@ -40,8 +39,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Wait for apt lock and install system dependencies (Linux)
-      if: runner.os == 'Linux'
+    - name: Wait for apt lock and install system dependencies
       run: |
         # Wait for any existing apt processes to complete
         echo "Waiting for apt lock to be released..."
@@ -98,12 +96,6 @@ jobs:
           fi
         done
 
-    - name: Install system dependencies (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        echo "Windows system dependencies are pre-installed"
-        # Windows runners come with most tools pre-installed
-
     - name: Install Python dependencies  
       run: |
         echo "Upgrading pip..."
@@ -122,15 +114,9 @@ jobs:
         
         echo "Python dependencies installed successfully"
 
-    - name: Set up Python path for tests (Linux/macOS)
-      if: runner.os != 'Windows'
+    - name: Set up Python path for tests
       run: |
         echo "PYTHONPATH=${{ github.workspace }}/VMEncryption/main:${{ github.workspace }}/VMEncryption:${{ github.workspace }}/Utils:${{ github.workspace }}" >> $GITHUB_ENV
-
-    - name: Set up Python path for tests (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        echo "PYTHONPATH=${{ github.workspace }}\VMEncryption\main;${{ github.workspace }}\VMEncryption;${{ github.workspace }}\Utils;${{ github.workspace }}" >> $env:GITHUB_ENV
 
     - name: Run VMEncryption tests with coverage
       working-directory: VMEncryption
@@ -145,7 +131,7 @@ jobs:
         python -m pytest test/ -v
 
     - name: Generate coverage summary for GitHub
-      if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+      if: matrix.python-version == '3.11'
       working-directory: VMEncryption
       run: |
         if [ -f "main/coverage.xml" ]; then
