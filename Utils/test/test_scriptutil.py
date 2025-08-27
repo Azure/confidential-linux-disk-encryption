@@ -26,27 +26,37 @@ class TestScriptUtil(unittest.TestCase):
         print(__file__)
         cmd = u'sh foo.bar.sh -af bar --foo=bar | more \u6211'
         args = su.parse_args(cmd.encode('utf-8'))
-        self.assertNotEquals(None, args)
-        self.assertNotEquals(0, len(args))
+        self.assertNotEqual(None, args)
+        self.assertNotEqual(0, len(args))
         print(args)
 
     def test_run_command(self):
         hutil = MockUtil(self)
-        test_script = "mock.sh"
-        os.chdir(os.path.join(env.root, "test"))
-        exit_code = su.run_command(hutil, ["sh", test_script, "0"], os.getcwd(), 'RunScript-0', 'TestExtension', '1.0', True, 0.1)
-        self.assertEquals(0, exit_code)
-        self.assertEquals("do_exit", hutil.last)
-        exit_code = su.run_command(hutil, ["sh", test_script, "75"], os.getcwd(), 'RunScript-1', 'TestExtension', '1.0', False, 0.1)
-        self.assertEquals(75, exit_code)
-        self.assertEquals("do_status_report", hutil.last)
+        import platform
+        test_dir = os.path.join(env.root, "test")
+        if platform.system() == 'Windows':
+            test_script = "mock.bat"
+            shell_cmd = "cmd"
+            shell_args = ["/c", test_script]
+        else:
+            test_script = "mock.sh"
+            shell_cmd = "sh"
+            shell_args = [test_script]
+        
+        os.chdir(test_dir)
+        exit_code = su.run_command(hutil, [shell_cmd] + shell_args + ["0"], os.getcwd(), 'RunScript-0', 'TestExtension', '1.0', True, 0.1)
+        self.assertEqual(0, exit_code)
+        self.assertEqual("do_exit", hutil.last)
+        exit_code = su.run_command(hutil, [shell_cmd] + shell_args + ["75"], os.getcwd(), 'RunScript-1', 'TestExtension', '1.0', False, 0.1)
+        self.assertEqual(75, exit_code)
+        self.assertEqual("do_status_report", hutil.last)
     
-    def test_log_or_exit(self):        
+    def test_log_or_exit(self):
         hutil = MockUtil(self)
         su.log_or_exit(hutil, True, 0, 'LogOrExit-0', 'Message1')
-        self.assertEquals("do_exit", hutil.last)
+        self.assertEqual("do_exit", hutil.last)
         su.log_or_exit(hutil, False, 0, 'LogOrExit-1', 'Message2')
-        self.assertEquals("do_status_report", hutil.last)
+        self.assertEqual("do_status_report", hutil.last)
         
 if __name__ == '__main__':
     unittest.main()
