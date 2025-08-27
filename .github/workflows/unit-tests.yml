@@ -122,7 +122,12 @@ jobs:
       working-directory: VMEncryption
       run: |
         echo "=== Running VMEncryption tests ==="
-        python -m pytest main/test/ -v --cov=main --cov-report=term --cov-report=xml:main/coverage.xml
+        echo "Current directory: $(pwd)"
+        echo "Testing source coverage for: main/"
+        python -m pytest main/test/ -v --cov=main --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+        echo "Coverage files generated:"
+        ls -la coverage.xml || echo "No coverage.xml found"
+        ls -la .coverage || echo "No .coverage found"
 
     - name: Run Utils tests
       working-directory: Utils
@@ -130,21 +135,57 @@ jobs:
         echo "=== Running Utils tests ==="
         python -m pytest test/ -v
 
+    - name: Debug coverage files
+      if: matrix.python-version == '3.11'
+      working-directory: VMEncryption
+      run: |
+        echo "=== Coverage Debug Information ==="
+        echo "Current working directory: $(pwd)"
+        echo "Files in VMEncryption directory:"
+        ls -la
+        echo "Files in main directory:"
+        ls -la main/ || echo "No main directory"
+        echo "Looking for coverage files:"
+        find . -name "coverage.xml" -type f 2>/dev/null || echo "No coverage.xml found"
+        find . -name ".coverage" -type f 2>/dev/null || echo "No .coverage found"
+        echo "Checking if coverage module can read data:"
+        coverage report 2>/dev/null || echo "Coverage command failed"
+
     - name: Generate coverage summary for GitHub
       if: matrix.python-version == '3.11'
       working-directory: VMEncryption
       run: |
-        if [ -f "main/coverage.xml" ]; then
+        echo "=== Generating Coverage Summary ==="
+        echo "Current directory: $(pwd)"
+        echo "Looking for coverage files..."
+        ls -la coverage.xml || echo "No coverage.xml found"
+        ls -la .coverage || echo "No .coverage found"
+        
+        if [ -f "coverage.xml" ]; then
           echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          coverage report --data-file=main/.coverage --format=markdown >> $GITHUB_STEP_SUMMARY 2>/dev/null || \
-          (echo "\`\`\`" >> $GITHUB_STEP_SUMMARY && \
-           coverage report --data-file=main/.coverage >> $GITHUB_STEP_SUMMARY 2>/dev/null && \
-           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY) || \
-          echo "Coverage data collected but report generation failed" >> $GITHUB_STEP_SUMMARY
+          
+          # Try to generate coverage report using the .coverage file
+          if [ -f ".coverage" ]; then
+            echo "Generating coverage report from .coverage file..."
+            coverage report --format=markdown >> $GITHUB_STEP_SUMMARY 2>/dev/null || \
+            (echo "\`\`\`" >> $GITHUB_STEP_SUMMARY && \
+             coverage report >> $GITHUB_STEP_SUMMARY 2>/dev/null && \
+             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY) || \
+            echo "Coverage report generation failed, but XML exists" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage XML file exists but .coverage file missing" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Also add some basic info from XML if possible
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage XML file generated successfully" >> $GITHUB_STEP_SUMMARY
         else
           echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "No coverage data available" >> $GITHUB_STEP_SUMMARY
+          echo "❌ No coverage data available - coverage.xml not found" >> $GITHUB_STEP_SUMMARY
+          echo "Debug info:" >> $GITHUB_STEP_SUMMARY
+          echo "- Working directory: $(pwd)" >> $GITHUB_STEP_SUMMARY
+          echo "- Files in directory: $(ls -la)" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Upload coverage as GitHub artifact
@@ -152,14 +193,17 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
-        path: VMEncryption/main/coverage.xml
+        path: |
+          VMEncryption/coverage.xml
+          VMEncryption/.coverage
+          VMEncryption/htmlcov/
         if-no-files-found: warn
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.11'
       uses: codecov/codecov-action@v4
       with:
-        file: VMEncryption/main/coverage.xml
+        file: VMEncryption/coverage.xml
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
