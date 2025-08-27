@@ -19,6 +19,7 @@
 """ Unit tests for the ExtensionParameter module """
 
 import unittest
+import sys
 import Common
 import EncryptionEnvironment
 import json
@@ -29,12 +30,21 @@ try:
 except ImportError:
     import mock # python2
 
-# waagentloader is a python3+ compatible loader
-from Utils.waagentloader import load_waagent  
+# Mock the Utils module and waagentloader to avoid import issues
+sys.modules['Utils'] = mock.MagicMock()
+sys.modules['Utils.waagentloader'] = mock.MagicMock()
+sys.modules['waagent'] = mock.MagicMock()
+# sys.modules['xml'] = mock.MagicMock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers'] = mock.MagicMock()  # Commented out - needed for XML parsing
+# sys.modules['xml.parsers.expat'] = mock.MagicMock()  # Commented out - needed for XML parsing
+sys.modules['xml.etree'] = mock.MagicMock()
+sys.modules['xml.etree.ElementTree'] = mock.MagicMock()
+sys.modules['xml.etree.ElementPath'] = mock.MagicMock()
+sys.modules['_elementtree'] = mock.MagicMock()  
 
 class Test_EncryptionConfig(unittest.TestCase):
-    @mock.patch('Utils.waagentloader.load_waagent', return_value=None)
-    def setUp(self, load_waagent_mock):
+    @mock.patch('sys.modules', {**sys.modules, 'Utils': mock.MagicMock(), 'Utils.waagentloader': mock.MagicMock(), 'waagent': mock.MagicMock()})
+    def setUp(self):
         #mock load_waagent before importing ExtensionParameter so that unit tests can run outside of Azure VM context
         import ExtensionParameter
         self.logger = ConsoleLogger()

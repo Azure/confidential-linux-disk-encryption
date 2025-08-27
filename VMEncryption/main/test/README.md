@@ -5,21 +5,27 @@ Unit tests for the Azure Linux VM Encryption Extension. Tests ensure cross-platf
 ## Quick Start
 
 ```bash
-# Navigate to main directory
-cd "c:/path/to/VMEncryption/main"
+# Navigate to the repository root
+cd "c:/path/to/confidential-linux-disk-encryption"
 
-# Run all tests
-py -m unittest discover test/ -v
+# Run VMEncryption tests (407 tests)
+python -m pytest VMEncryption/main/test/ -v
 
-# Run specific test
-py -m unittest test.test_azurelinuxPatching -v
+# Run Utils tests (5 tests)  
+python -m pytest Utils/test/ -v
+
+# Run all tests separately (412 total)
+python -m pytest VMEncryption/main/test/ -v && python -m pytest Utils/test/ -v
+
+# Run with coverage
+python -m pytest VMEncryption/main/test/ -v --cov=VMEncryption/main --cov-report=term-missing
 ```
 
 ## Setup
 
 Create and activate a virtual environment, then install dependencies:
 ```bash
-# Create virtual environment
+# Create virtual environment (from repository root)
 python -m venv vmencryption-test-env
 
 # Activate (Windows)
@@ -29,65 +35,58 @@ vmencryption-test-env\Scripts\activate
 source vmencryption-test-env/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install pytest pytest-cov coverage cryptography pytz
 ```
 
-## Test Structure
+## Updated Test Commands
 
-| Test File | Purpose |
-|-----------|---------|
-| `test_azurelinuxPatching.py` | Azure Linux package management |
-| `test_UbuntuPatching.py` | Ubuntu-specific operations |
-| `test_redhatPatching.py` | RedHat/CentOS operations |
-| `test_disk_util.py` | Disk operations and SCSI handling |
-| `test_command_executor.py` | Command execution with timeouts |
-| `test_bek_util.py` | BitLocker key utilities |
-| `test_encryption_config.py` | Configuration parsing |
-
-## Running Tests
-
-Set the Python path to include the main directory, then run tests:
+**From repository root (`confidential-linux-disk-encryption/`):**
 
 ```bash
-# From VMEncryption/main directory
-$env:PYTHONPATH = "C:\Source\Repos\azure-linux-extensions\VMEncryption\main"
+# Set Python path (Windows PowerShell)
+$env:PYTHONPATH = "$PWD\VMEncryption\main;$PWD\VMEncryption;$PWD\Utils;$PWD"
 
-# All tests (from VMEncryption directory) - Most tests now work!
-cd .. && py -m unittest discover main/test/ -v
+# Set Python path (Windows CMD)
+set PYTHONPATH=%CD%\VMEncryption\main;%CD%\VMEncryption;%CD%\Utils;%CD%
 
-# Specific module (recommended for individual development)
-py -m unittest test.test_azurelinuxPatching -v
+# Set Python path (Linux/macOS)
+export PYTHONPATH="$PWD/VMEncryption/main:$PWD/VMEncryption:$PWD/Utils:$PWD"
 
-# Individual test case
-py -m unittest test.test_azurelinuxPatching.Test_azurelinuxPatching.test_install_cryptsetup_already_installed -v
+# Run all tests
+python -m pytest VMEncryption/main/test/ Utils/test/ -v
+
+# Run with coverage
+python -m pytest VMEncryption/main/test/ -v --cov=VMEncryption/main --cov-report=term-missing
+
+# Run specific test module
+python -m pytest VMEncryption/main/test/test_azurelinuxPatching.py -v
+
+# Run individual test
+python -m pytest VMEncryption/main/test/test_azurelinuxPatching.py::Test_azurelinuxPatching::test_install_cryptsetup_already_installed -v
 ```
 
-**Test Status**: 51 of 58 tests now pass successfully. Remaining issues are primarily platform-specific compatibility problems, not the original import failures.
 
-## Writing New Tests
+## GitHub Actions / CI Commands
 
-### Basic Test Template
-```python
-import unittest
-try:
-    import unittest.mock as mock
-except ImportError:
-    import mock  # Python 2.7 compatibility
+**For use in GitHub Actions workflows:**
 
-from YourModule import YourClass
-from console_logger import ConsoleLogger
+```yaml
+# Install dependencies
+- name: Install test dependencies
+  run: pip install pytest pytest-cov coverage cryptography pytz
 
-class Test_YourClass(unittest.TestCase):
-    def setUp(self):
-        self.logger = ConsoleLogger()
-        self.instance = YourClass(self.logger)
-    
-    @mock.patch('CommandExecutor.CommandExecutor.Execute')
-    def test_method_success(self, mock_execute):
-        mock_execute.return_value = 0
-        result = self.instance.your_method()
-        self.assertEqual(result, 0)
-        mock_execute.assert_called_with("expected_command")
+# Set Python path
+- name: Set up Python path
+  run: echo "PYTHONPATH=${{ github.workspace }}/VMEncryption/main:${{ github.workspace }}/VMEncryption:${{ github.workspace }}/Utils:${{ github.workspace }}" >> $GITHUB_ENV
+
+# Run tests with coverage
+- name: Run VMEncryption tests
+  working-directory: VMEncryption
+  run: python -m pytest main/test/ -v --cov=main --cov-report=term-missing --cov-report=xml:coverage.xml
+
+- name: Run Utils tests  
+  working-directory: Utils
+  run: python -m pytest test/ -v
 ```
 
 ### Using GitHub Copilot

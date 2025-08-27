@@ -15,18 +15,29 @@
 # limitations under the License.
 
 import unittest
+import tempfile
+import os
 import LogUtil as lu
 
 
 class TestLogUtil(unittest.TestCase):    
     def test_tail(self):
-        with open("/tmp/testtail", "w+") as F:
-            F.write(u"abcdefghijklmnopqrstu\u6211vwxyz".encode("utf-8"))
-        tail = lu.tail("/tmp/testtail", 2)
-        self.assertEquals("yz", tail)
+        # Create a temporary file that works on both Windows and Unix
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8") as F:
+            temp_path = F.name
+            # Write unicode string directly (no encoding needed for text mode)
+            F.write("abcdefghijklmnopqrstu\u6211vwxyz")
+        
+        try:
+            tail = lu.tail(temp_path, 2)
+            self.assertEqual("yz", tail)
 
-        tail = lu.tail("/tmp/testtail")
-        self.assertEquals("abcdefghijklmnopqrstuvwxyz", tail)
+            tail = lu.tail(temp_path)
+            self.assertEqual("abcdefghijklmnopqrstuvwxyz", tail)
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
 if __name__ == '__main__':
     unittest.main()

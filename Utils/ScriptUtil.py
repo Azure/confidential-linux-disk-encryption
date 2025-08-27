@@ -109,8 +109,11 @@ def log_or_exit(hutil, exit_after_run, exit_code, operation, msg):
 
 
 def parse_args(cmd):
-    cmd = filter(lambda x : x in string.printable, cmd)
-    cmd = cmd.decode("ascii", "ignore")
+    # Handle both bytes and string input
+    if isinstance(cmd, bytes):
+        cmd = cmd.decode("utf-8", "ignore")
+    # Convert filter result to string and filter printable characters
+    cmd = ''.join(filter(lambda x: x in string.printable, cmd))
     args = shlex.split(cmd)
     # From python 2.6 to python 2.7.2, shlex.split output UCS-4 result like
     # '\x00\x00a'. Temp workaround is to replace \x00
