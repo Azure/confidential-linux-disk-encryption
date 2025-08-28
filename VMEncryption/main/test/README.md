@@ -9,9 +9,23 @@ Simple test setup and execution for the Azure Linux VM Encryption Extension.
 
 ## Setup
 
-1. Install dependencies:
+1. Create and activate a virtual environment, then install dependencies:
+
 ```bash
+# Create virtual environment
+python -m venv vmencryption-test-env
+
+# Activate (Windows)
+vmencryption-test-env\Scripts\activate
+
+# Activate (Linux/macOS)
+source vmencryption-test-env/bin/activate
+
+# Install dependencies
+pip install pytest pytest-cov coverage cryptography pytz
+
 py -m pip install -r ../../requirements.txt
+
 ```
 
 ## Running Tests
