@@ -94,21 +94,21 @@ class TestMachineIdentity(unittest.TestCase):
         test_identity = "stored-test-identity"
         
         with patch('builtins.open', mock_open(read_data=test_identity)):
-            with patch('os.path.isfile', return_value=True):
+            with patch('os.path.exists', return_value=True):
                 result = self.machine_identity.stored_identity()
                 
                 self.assertEqual(result, test_identity)
     
     def test_stored_identity_file_not_exists(self):
         """Test behavior when stored identity file doesn't exist."""
-        with patch('os.path.isfile', return_value=False):
+        with patch('os.path.exists', return_value=False):
             result = self.machine_identity.stored_identity()
             
-            self.assertEqual(result, "")
+            self.assertIsNone(result)
     
     def test_stored_identity_file_read_error(self):
         """Test behavior when stored identity file exists but can't be read."""
-        with patch('os.path.isfile', return_value=True):
+        with patch('os.path.exists', return_value=True):
             with patch('builtins.open', side_effect=IOError("Read error")):
                 with self.assertRaises(IOError):
                     self.machine_identity.stored_identity()
@@ -140,7 +140,7 @@ class TestMachineIdentity(unittest.TestCase):
             
             # Third call - read stored identity
             with patch('builtins.open', mock_open(read_data=test_guid)), \
-                 patch('os.path.isfile', return_value=True):
+                 patch('os.path.exists', return_value=True):
                 stored_id = self.machine_identity.stored_identity()
                 self.assertEqual(stored_id, test_guid)
 
