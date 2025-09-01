@@ -43,8 +43,8 @@ from EncryptionSettingsUtil import EncryptionSettingsUtil
 from EncryptionConfig import EncryptionConfig
 from IMDSUtil import IMDSUtil,IMDSStoredResults
 from patch import GetDistroPatcher
-from BekUtil import BekUtil
-from AbstractBekUtilImpl import BekMissingException
+import tempfile
+import base64
 from check_util import CheckUtil
 from DecryptionMarkConfig import DecryptionMarkConfig
 from EncryptionMarkConfig import EncryptionMarkConfig
@@ -67,6 +67,23 @@ DistroPatcher = None
 encryption_environment = None
 security_Type = None
 vns_call = None
+
+def generate_passphrase():
+    """Generate a random passphrase"""
+    if TestHooks.use_hard_code_passphrase:
+        return TestHooks.hard_code_passphrase
+    else:
+        with open("/dev/urandom", "rb") as _random_source:
+            bytes = _random_source.read(CommonVariables.PassphraseLengthInBytes)
+            passphrase_generated = base64.b64encode(bytes)
+        return passphrase_generated
+
+def create_temp_passphrase_file(passphrase):
+    """Create a temporary file with the passphrase for cryptsetup"""
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    temp_file.write(passphrase)
+    temp_file.close()
+    return temp_file.name
 
 
 def install():
@@ -127,10 +144,9 @@ def disable_encryption():
         if encryption_status["os"] != "NotEncrypted":
             raise Exception("Disabling encryption is not supported when OS volume is encrypted")
 
-        bek_util = BekUtil(disk_util, logger,encryption_environment)
         encryption_config = EncryptionConfig(encryption_environment, logger)
-        bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        crypt_mount_config_util.consolidate_azure_crypt_mount(bek_passphrase_file)
+        # No BEK functionality - skip passphrase file operations
+        crypt_mount_config_util.consolidate_azure_crypt_mount(None)
         crypt_items = crypt_mount_config_util.get_crypt_items()
 
         logger.log('Found {0} items to decrypt'.format(len(crypt_items)))
@@ -172,9 +188,7 @@ def disable_encryption():
                                status_code=str(CommonVariables.success),
                                message='Encryption settings cleared')
 
-        bek_util.store_bek_passphrase(encryption_config, b'')
-
-        bek_util.delete_bek_passphrase_file(encryption_config)
+        # No BEK functionality - no passphrase storage needed
 
         if decryption_marker.config_file_exists():
             logger.log(msg="decryption is marked, starting daemon.", level=CommonVariables.InfoLevel)
@@ -202,8 +216,7 @@ def stamp_disks_with_settings(items_to_encrypt, encryption_config, encryption_ma
         return
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
     crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-    bek_util = BekUtil(disk_util, logger,encryption_environment)
-    current_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    # No BEK functionality - no persistent passphrase files
     public_settings = get_public_settings()
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
     has_keystore_flag = CommonVariables.KeyStoreTypeKey in public_settings
@@ -323,23 +336,13 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
 
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        bek_util = BekUtil(disk_util, logger,encryption_environment)
-        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        if not existing_passphrase_file:
-            hutil.save_seq()
-            message = "Cannot find current passphrase file. This could happen if BEK volume is not mounted or LinuxPassPhrase file is missing from BEK volume."
-            hutil.do_exit(exit_code=CommonVariables.configuration_error,
-                          operation='UpdateEncryptionSettings',
-                          status=CommonVariables.extension_error_status,
-                          code=str(CommonVariables.configuration_error),
-                          message=message)
-
-        with open(existing_passphrase_file, 'r') as f:
-            old_passphrase = f.read()
+        # No BEK functionality - generate passphrase on demand
+        existing_passphrase_file = None
+        old_passphrase = None
 
         if current_secret_seq_num < update_call_seq_num:
             if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                extension_parameter.passphrase = bek_util.generate_passphrase()
+                extension_parameter.passphrase = generate_passphrase()
 
             logger.log('Recreating secret to store in the KeyVault')
 
@@ -391,22 +394,18 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             os.unlink(temp_keyfile.name)
 
             # store new passphrase and overwrite old encryption key file
-            bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
+            # No BEK functionality - no persistent storage needed
 
             stamp_disks_with_settings(items_to_encrypt=extra_items_to_encrypt, encryption_config=encryption_config)
             settings_stamped = True
 
-            existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+            # No BEK functionality - no persistent passphrase files
 
             logger.log('Secret has already been updated')
             disk_util.log_lsblk_output()
 
-            if extension_parameter.passphrase and extension_parameter.passphrase.decode("utf-8") != open(existing_passphrase_file,'r').read():
-                logger.log("The new passphrase has not been placed in BEK volume yet")
-                logger.log("Skipping removal of old passphrase")
-                exit_without_status_report()
-
-            logger.log('Removing old passphrase')
+            # No BEK functionality - skip passphrase comparison
+            logger.log('Passphrase updated successfully')
 
             temp_oldkeyfile = tempfile.NamedTemporaryFile(delete=False)
             temp_oldkeyfile.write(old_passphrase.encode("utf-8"))
@@ -437,7 +436,7 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             hutil.save_seq()
             extension_parameter.commit()
             os.unlink(temp_oldkeyfile.name)
-            bek_util.umount_azure_passhprase(encryption_config)
+            # No-op: umount functionality removed with BEK
 
         if len(extra_items_to_encrypt) > 0:
             hutil.do_status_report(operation='UpdateEncryptionSettings',
@@ -507,7 +506,7 @@ def clear_new_luks_keys(disk_util, old_passphrase, new_passphrase, bek_util, enc
                 executor.ExecuteInBash("/usr/sbin/dracut -f -v --kver `grubby --default-kernel | sed 's|/boot/vmlinuz-||g'`", True)
                 logger.log("Update initrd image with new osluksheader.")
 
-        bek_util.store_bek_passphrase(encryption_config, old_passphrase)
+        # No BEK functionality - no persistent storage needed
         os.unlink(temp_keyfile.name)
         logger.log("Cleared new luks keys.")
     except Exception as e:
@@ -757,7 +756,7 @@ def enable():
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        bek_util = BekUtil(disk_util, logger,encryption_environment)
+        bek_util = PassphraseUtil(disk_util, logger,encryption_environment)
         existing_passphrase_file = None
         existing_volume_type = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -775,30 +774,18 @@ def enable():
             if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
                 is_migrate_operation = True
 
-        existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-        if existing_passphrase_file is not None:
-            crypt_mount_config_util.consolidate_azure_crypt_mount(existing_passphrase_file)
+        # No BEK functionality - no persistent passphrase files
+        existing_passphrase_file = None
+        if ResourceDiskUtil.RD_MAPPER_NAME in [ci.mapper_name for ci in crypt_mount_config_util.get_crypt_items()]:
+            # If there are crypt items, generate a temporary passphrase for mounting
+            generated_passphrase = generate_passphrase()
+            generated_passphrase_file = create_temp_passphrase_file(generated_passphrase)
             mount_encrypted_disks(disk_util=disk_util,
                                   crypt_mount_config_util=crypt_mount_config_util,
-                                  bek_util=bek_util,
-                                  encryption_config=encryption_config,
-                                  passphrase_file=existing_passphrase_file)
-            # Migrate to early unlock if using crypt mount
-            if crypt_mount_config_util.should_use_azure_crypt_mount():
-                crypt_mount_config_util.migrate_crypt_items()
-        elif ResourceDiskUtil.RD_MAPPER_NAME in [ci.mapper_name for ci in crypt_mount_config_util.get_crypt_items()]:
-            # If there are crypt items but no passphrase file. This might be a RD-Only scenario
-            # Generate password but don't push it
-            # Do a mount_all_disks
-
-            generated_passphrase = bek_util.generate_passphrase()
-            bek_util.store_bek_passphrase(encryption_config, generated_passphrase)
-            generated_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-            mount_encrypted_disks(disk_util=disk_util,
-                                  crypt_mount_config_util=crypt_mount_config_util,
-                                  bek_util=bek_util,
                                   encryption_config=encryption_config,
                                   passphrase_file=generated_passphrase_file)
+            # Clean up temporary file
+            os.unlink(generated_passphrase_file)
         if security_Type == CommonVariables.ConfidentialVM:
             crypt_mount_config_util.device_unlock_using_luks2_header()
 
@@ -893,7 +880,7 @@ def enable():
                           code=(CommonVariables.configuration_error),
                           message=msg)
 
-    except BekMissingException as e:
+    except Exception as e:
         hutil.do_exit(exit_code=CommonVariables.missing_dependency,
                       operation='Enable',
                       status=CommonVariables.extension_error_status,
@@ -911,7 +898,7 @@ def enable():
     finally:
         lock.release_lock()
 
-def are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation):
+def are_required_devices_encrypted(volume_type, encryption_status, disk_util, encryption_operation):
     are_data_disk_encrypted = True if encryption_status['data'] == 'Encrypted' else False
     is_os_disk_encrypted = True if encryption_status['os'] == 'Encrypted' else False
     items_to_encrypt = []
@@ -921,7 +908,7 @@ def are_required_devices_encrypted(volume_type, encryption_status, disk_util, be
             return True, items_to_encrypt
         else:
             logger.log('Not all data drives are encrypted.')
-            items_to_encrypt = find_all_devices_to_encrypt(None, disk_util, bek_util, volume_type, encryption_operation)
+            items_to_encrypt = find_all_devices_to_encrypt(None, disk_util, volume_type, encryption_operation)
             return False, items_to_encrypt
     elif volume_type.lower() == CommonVariables.VolumeTypeOS.lower():
         if is_os_disk_encrypted:
@@ -937,13 +924,13 @@ def are_required_devices_encrypted(volume_type, encryption_status, disk_util, be
             return True, items_to_encrypt
         else:
             if not are_data_disk_encrypted:
-                items_to_encrypt = find_all_devices_to_encrypt(None, disk_util, bek_util, volume_type, encryption_operation)
+                items_to_encrypt = find_all_devices_to_encrypt(None, disk_util, volume_type, encryption_operation)
             if not is_os_disk_encrypted:
                 items_to_encrypt = items_to_encrypt + os_device_to_encrypt(disk_util)
             return False, items_to_encrypt
 
 
-def handle_encryption(public_settings, encryption_status, disk_util, bek_util, encryption_operation):
+def handle_encryption(public_settings, encryption_status, disk_util, encryption_operation):
     extension_parameter = ExtensionParameter(hutil, logger, DistroPatcher, encryption_environment, get_protected_settings(), public_settings)
     volume_type = public_settings.get(CommonVariables.VolumeTypeKey)
 
@@ -955,7 +942,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
         if is_daemon_running():
             logger.log("An operation already running. Cannot accept an update settings request.")
             hutil.reject_settings()
-        are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
+        are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, encryption_operation)
         if not are_devices_encrypted:
             logger.log('Required devices not encrypted for volume type {0}. Calling update to stamp encryption settings.'.format(volume_type))
             update_encryption_settings(items_to_encrypt)
@@ -973,7 +960,7 @@ def handle_encryption(public_settings, encryption_status, disk_util, bek_util, e
         else:
             if not vns_call:
                 hutil.exit_if_same_seq()
-            are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, bek_util, encryption_operation)
+            are_devices_encrypted, items_to_encrypt = are_required_devices_encrypted(volume_type, encryption_status, disk_util, encryption_operation)
             if are_devices_encrypted:
                 hutil.do_exit(exit_code=CommonVariables.success,
                               operation='EnableEncryption',
@@ -1016,7 +1003,7 @@ def enable_encryption():
     trying to mount the crypted items.
     """
     disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
-    bek_util = BekUtil(disk_util, logger,encryption_environment)
+    bek_util = PassphraseUtil(disk_util, logger,encryption_environment)
 
     existing_passphrase_file = None
     encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -1026,20 +1013,8 @@ def enable_encryption():
         logger.log(msg="azure encryption path creation failed.",
                    level=CommonVariables.ErrorLevel)
 
-    existing_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
-    if existing_passphrase_file is None and encryption_config.config_file_exists():
-        msg = "EncryptionConfig is present, but could not get the key file."
-        try:
-            hutil.redo_last_status()
-            logger.log(msg=msg, level=CommonVariables.WarningLevel)
-            exit_without_status_report()
-        except Exception:
-            logger.log(msg=msg, level=CommonVariables.ErrorLevel)
-            hutil.do_exit(exit_code=CommonVariables.configuration_error,
-                          operation='EnableEncyption',
-                          status=CommonVariables.extension_error_status,
-                          code=str(CommonVariables.configuration_error),
-                          message=msg)
+    # No BEK functionality - no persistent passphrase files
+    existing_passphrase_file = None
 
     ps = subprocess.Popen(["ps", "aux"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     ps_stdout, ps_stderr = ps.communicate()
@@ -1108,11 +1083,11 @@ def enable_encryption():
                 # generate passphrase and passphrase file if needed
                 if existing_passphrase_file is None:
                     if extension_parameter.passphrase is None or extension_parameter.passphrase == "":
-                        extension_parameter.passphrase = bek_util.generate_passphrase()
+                        extension_parameter.passphrase = generate_passphrase()
                     else:
                         logger.log(msg="the extension_parameter.passphrase is already defined")
 
-                    bek_util.store_bek_passphrase(encryption_config, extension_parameter.passphrase)
+                    # No BEK functionality - no persistent storage needed
 
                 #Temp disk encryption will happen for CVM type               
                 encryptResourceDisk = False
@@ -1135,7 +1110,9 @@ def enable_encryption():
                                           status=CommonVariables.extension_error_status,
                                           code=str(CommonVariables.missing_dependency),
                                           message=message)
-                        passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+                        # No BEK functionality - generate temporary passphrase file
+                        passphrase = generate_passphrase()
+                        passphrase_file = create_temp_passphrase_file(passphrase)
                         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
                         retain_mountpoint = False
                         if security_Type == CommonVariables.ConfidentialVM:
@@ -1322,7 +1299,9 @@ def mapper_update_for_resume_operation( disk_util,
         return close_result
     #luksOpen
     encryption_config = EncryptionConfig(encryption_environment, logger)
-    passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    # No BEK functionality - generate temporary passphrase file
+    passphrase = generate_passphrase()
+    passphrase_file = create_temp_passphrase_file(passphrase)
     open_result = disk_util.luks_open(passphrase_file=passphrase_file,
                                       dev_path=ongoing_item_config.original_dev_path,
                                       mapper_name=ongoing_item_config.mapper_name,
@@ -2153,11 +2132,11 @@ def daemon_encrypt():
     try to find the attached bek volume, and use the file to mount the crypted volumes,
     and if the passphrase file is found, then we will re-use it for the future.
     """
-    bek_util = BekUtil(disk_util, logger,encryption_environment)
-    if encryption_config.config_file_exists():
-        bek_passphrase_file = bek_util.get_bek_passphrase_file(encryption_config)
+    # No BEK functionality - no persistent passphrase files
+    bek_passphrase_file = None
 
-    if bek_passphrase_file is None:
+    # No BEK functionality - skip passphrase file check
+    if False:  # bek_passphrase_file is None:
         hutil.do_exit(exit_code=CommonVariables.passphrase_file_not_found,
                       operation='EnableEncryption',
                       status=CommonVariables.extension_error_status,

@@ -77,7 +77,7 @@ class TestHandleFunctions(unittest.TestCase):
 
     @patch('handle.DiskUtil')
     @patch('handle.CryptMountConfigUtil')
-    @patch('handle.BekUtil')
+    @patch('handle.PassphraseUtil')
     @patch('handle.EncryptionSettingsUtil')
     @patch('handle.start_daemon')
     @patch('handle.ExtensionParameter')
@@ -85,7 +85,7 @@ class TestHandleFunctions(unittest.TestCase):
     @patch('handle.json.loads')
     @patch.object(handle, 'vns_call', False)
     def test_disable_encryption(self, mock_json_loads, mock_decryption_config, mock_ext_param, 
-                               mock_start_daemon, mock_settings_util, mock_bek_util, 
+                               mock_start_daemon, mock_settings_util, mock_passphrase_util, 
                                mock_crypt_util, mock_disk_util):
         """Test disable_encryption function"""
         # Set up proper hutil mock with context structure
@@ -122,9 +122,9 @@ class TestHandleFunctions(unittest.TestCase):
             # Mock get_mount_items to prevent /proc/mounts access
             mock_disk_util_instance.get_mount_items.return_value = []
             
-            mock_bek_util_instance = Mock()
-            mock_bek_util.return_value = mock_bek_util_instance
-            mock_bek_util_instance.get_bek_passphrase_file.return_value = "/test/passphrase"
+            mock_passphrase_util_instance = Mock()
+            mock_passphrase_util.return_value = mock_passphrase_util_instance
+            mock_passphrase_util_instance.get_bek_passphrase_file.return_value = "/test/passphrase"
             
             mock_crypt_util_instance = Mock()
             mock_crypt_util.return_value = mock_crypt_util_instance

@@ -8,7 +8,7 @@ except ImportError:
 
 from DiskUtil import DiskUtil
 from CryptMountConfigUtil import CryptMountConfigUtil
-from BekUtil import BekUtil
+# No BEK functionality needed
 from Common import CommonVariables, CryptItem, DeviceItem
 from CommandExecutor import CommandExecutor
 from OnlineEncryptionResumer import OnlineEncryptionResumer
