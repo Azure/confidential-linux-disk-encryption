@@ -666,10 +666,7 @@ class CryptMountConfigUtil(object):
             wf.write(mount_content_item)
 
     def is_bek_in_fstab_file(self, lines):
-        for line in lines:
-            fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
-            if fstab_mount_point and os.path.normpath(fstab_mount_point) == os.path.normpath(CommonVariables.encryption_key_mount_point):
-                return True
+        # No BEK functionality - always return False
         return False
 
     def parse_fstab_line(self, line):
@@ -747,18 +744,12 @@ class CryptMountConfigUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.disk_util.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.disk_util.distro_patcher.distro_info[1].startswith('14'):
-            return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
-        else:
-            return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)
+        # No BEK functionality - return empty string
+        return ""
 
     def add_bek_to_default_cryptdisks(self):
-        if os.path.exists("/etc/default/cryptdisks"):
-            with open("/etc/default/cryptdisks", 'r') as f:
-                lines = f.readlines()
-            if not any(["azure_bek_disk" in line for line in lines]):
-                with open("/etc/default/cryptdisks", 'a') as f:
-                    f.write(CommonVariables.etc_defaults_cryptdisks_line.format(CommonVariables.encryption_key_mount_point))
+        # No BEK functionality - no-op
+        pass
 
     def remove_mount_info(self, mount_point):
         if not mount_point:
@@ -910,12 +901,5 @@ class CryptMountConfigUtil(object):
             self.logger.log(msg=("the azure crypt mount file not exist: {0}".format(self.encryption_environment.azure_crypt_mount_config_path)), level=CommonVariables.InfoLevel)
 
     def add_bek_in_fstab(self):
-        with open('/etc/fstab', 'r') as f:
-            lines = f.readlines()
-        
-        if not self.is_bek_in_fstab_file(lines):
-            self.logger.log("BEK volume not detected in fstab. Adding it now.")
-            lines.append(self.get_fstab_bek_line())
-            self.add_bek_to_default_cryptdisks()
-            with open('/etc/fstab', 'w') as f:
-                f.writelines(lines)
+        # No BEK functionality - no-op
+        pass

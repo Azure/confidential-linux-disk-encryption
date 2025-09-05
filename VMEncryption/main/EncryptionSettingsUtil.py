@@ -80,7 +80,9 @@ class EncryptionSettingsUtil(object):
 
     def create_protector_file(self, existing_passphrase_file, protector_name):
         """create temporary protector file corresponding to protector name"""
-        dst = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        dst = os.path.join(tempfile.gettempdir(), protector_name)
         copyfile(existing_passphrase_file, dst)
         import ctypes
         libc = ctypes.CDLL("libc.so.6")
@@ -89,12 +91,16 @@ class EncryptionSettingsUtil(object):
 
     def remove_protector_file(self, protector_name):
         """remove temporary protector file corresponding to protector name parameter"""
-        os.remove(os.path.join(CommonVariables.encryption_key_mount_point, protector_name))
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        os.remove(os.path.join(tempfile.gettempdir(), protector_name))
         return
 
     def get_settings_file_path(self):
         """get the full path to the current encryption settings file"""
-        return os.path.join(CommonVariables.encryption_key_mount_point, self.get_settings_file_name())
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        return os.path.join(tempfile.gettempdir(), self.get_settings_file_name())
 
     def get_settings_file_name(self):
         """get the base file name of the current encryption settings file"""
@@ -298,7 +304,9 @@ class EncryptionSettingsUtil(object):
                     }]
                 })
 
-        full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        full_protector_path = os.path.join(tempfile.gettempdir(), protector_name)
         # b64encode takes a bytes like object, so read as binary data
         with open(full_protector_path, "rb") as protector_file:
             protector_data = protector_file.read()

@@ -96,8 +96,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
                     [device_item], 
                     passphrase_file, 
                     mock_disk_util, 
-                    mock_crypt_mount_config_util, 
-                    mock_bek_util
+                    mock_crypt_mount_config_util
                 )
                 
                 # Verify calls
@@ -127,8 +126,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
             [device_item], 
             passphrase_file, 
             mock_disk_util, 
-            mock_crypt_mount_config_util, 
-            mock_bek_util
+            mock_crypt_mount_config_util
         )
         
         # Verify error was logged and device returned
@@ -158,8 +156,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
             [device_item], 
             passphrase_file, 
             mock_disk_util, 
-            mock_crypt_mount_config_util, 
-            mock_bek_util
+            mock_crypt_mount_config_util
         )
         
         # Verify error was logged and device returned
@@ -190,8 +187,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
             [device_item], 
             passphrase_file, 
             mock_disk_util, 
-            mock_crypt_mount_config_util, 
-            mock_bek_util
+            mock_crypt_mount_config_util
         )
         
         # Verify error was logged and device returned
@@ -224,8 +220,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
                 [device_item], 
                 passphrase_file, 
                 mock_disk_util, 
-                mock_crypt_mount_config_util, 
-                mock_bek_util
+                mock_crypt_mount_config_util
             )
             
             # Verify error was logged and device returned
@@ -268,8 +263,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
                     [device_item], 
                     passphrase_file, 
                     mock_disk_util, 
-                    mock_crypt_mount_config_util, 
-                    mock_bek_util
+                    mock_crypt_mount_config_util
                 )
                 
                 # Verify update_crypttab_and_fstab was called with passphrase file
