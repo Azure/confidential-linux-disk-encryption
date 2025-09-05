@@ -98,7 +98,6 @@ class UnmountOldrootState(OSEncryptionState):
                 # needs to be restarted and the drive mounted/unmounted.
                 # Otherwise the dir becomes inaccessible, fuse says: Transport endpoint is not connected
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
-                # No BEK functionality - no umount needed
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
                 self.command_executor.Execute('systemctl restart systemd-udevd', True)
                 self.command_executor.ExecuteInBash('sleep 30 && systemctl start waagent &', True)

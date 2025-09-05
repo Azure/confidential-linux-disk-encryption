@@ -78,8 +78,6 @@ class UnmountOldrootState(OSEncryptionState):
         self.command_executor.Execute('mount -t sysfs sysfs /sys')
         self.command_executor.Execute('swapoff -a', True)
 
-        # No BEK functionality - no umount needed
-
         if os.path.exists("/oldroot/mnt/resource"):
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 

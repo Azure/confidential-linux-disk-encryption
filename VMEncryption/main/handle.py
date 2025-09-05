@@ -446,7 +446,6 @@ def update_encryption_settings(extra_items_to_encrypt=[]):
             clear_new_luks_keys(disk_util, old_passphrase, extension_parameter.passphrase, encryption_config, updated_crypt_items)
         message = "Failed to update encryption settings with error: {0}, stack trace: {1}".format(e, traceback.format_exc())
         logger.log(msg=message, level=CommonVariables.ErrorLevel)
-        # No BEK functionality - no umount needed
         hutil.do_exit(exit_code=CommonVariables.unknown_error,
                       operation='UpdateEncryptionSettings',
                       status=CommonVariables.extension_error_status,
