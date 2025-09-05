@@ -256,6 +256,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
                                                               mount_point="/mnt/datadisk")),
                          str(crypt_items[0]))
 
+    @mock.patch('os.makedirs')
     @mock.patch('shutil.copy2', return_value=True)
     @mock.patch('os.rename', return_value=True)
     @mock.patch('os.path.exists', return_value=True)
@@ -263,7 +264,7 @@ class Test_crypt_mount_config_util(unittest.TestCase):
     @mock.patch('CryptMountConfigUtil.CryptMountConfigUtil.should_use_azure_crypt_mount', return_value=True)
     @mock.patch('DiskUtil.DiskUtil', autospec=True)
     @mock.patch('CryptMountConfigUtil.CryptMountConfigUtil.add_bek_to_default_cryptdisks', return_value=None)
-    def test_migrate_crypt_items(self, bek_to_crypt_mock, disk_util_mock, use_acm_mock, open_mock, exists_mock, rename_mock, shutil_mock):
+    def test_migrate_crypt_items(self, bek_to_crypt_mock, disk_util_mock, use_acm_mock, open_mock, exists_mock, rename_mock, shutil_mock, makedirs_mock):
 
         def rename_side_effect(name1, name2):
             use_acm_mock.return_value = False
@@ -428,7 +429,8 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertTrue("/dev/mapper/mapper_name /mnt/point" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/fstab_line"])
         self.assertTrue("mapper_name /dev/dev_path /mnt/azure_bek_disk/LinuxPassPhraseFileName_1_0 luks,nofail" not in open_mock.content_dict["/mnt/point/.azure_ade_backup_mount_info/crypttab_line"])
 
-    def test_get_key_file_path(self):
+    @mock.patch('os.makedirs')
+    def test_get_key_file_path(self, makedirs_mock):
         # Test with default case - no scsi/lun numbers
         self.crypt_mount_config_util.disk_util = mock.Mock()
         self.crypt_mount_config_util.disk_util.get_azure_data_disk_controller_and_lun_numbers.return_value = []
@@ -507,10 +509,11 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertTrue(result)
         self.crypt_mount_config_util.disk_util.make_sure_path_exists.assert_called_with(backup_folder)
 
+    @mock.patch('os.makedirs')
     @mock.patch('os.path.exists')
     @mock.patch('os.chmod')
     @mock.patch(builtins_open)
-    def test_add_crypt_item_to_crypttab(self, open_mock, chmod_mock, exists_mock):
+    def test_add_crypt_item_to_crypttab(self, open_mock, chmod_mock, exists_mock, makedirs_mock):
         self.crypt_mount_config_util.disk_util = mock.Mock()
         self.crypt_mount_config_util.disk_util.get_azure_data_disk_controller_and_lun_numbers.return_value = [(1, 0)]
         
@@ -817,7 +820,8 @@ class Test_crypt_mount_config_util(unittest.TestCase):
         self.assertEqual(False, crypt_item.uses_cleartext_key)
         self.assertEqual(-1, crypt_item.current_luks_slot)
 
-    def test_get_key_file_path_edge_cases(self):
+    @mock.patch('os.makedirs')
+    def test_get_key_file_path_edge_cases(self, makedirs_mock):
         # Test with empty scsi/lun and custom encryption environment
         self.crypt_mount_config_util.disk_util = mock.Mock()
         self.crypt_mount_config_util.disk_util.get_azure_data_disk_controller_and_lun_numbers.return_value = []
@@ -976,11 +980,12 @@ mapper3 /dev/sda3 /mnt/azure_bek_disk/LinuxPassPhraseFileName luks"""
         mock_thread_instance.start.assert_called_once()
         mock_thread_instance.join.assert_called_once()
 
+    @mock.patch('os.makedirs')
     @mock.patch('os.chmod')
     @mock.patch('os.path.realpath')
     @mock.patch(builtins_open)
     @mock.patch('DiskUtil.DiskUtil')
-    def test_device_unlock_using_luks2_header_private(self, disk_util_mock, open_mock, realpath_mock, chmod_mock):
+    def test_device_unlock_using_luks2_header_private(self, disk_util_mock, open_mock, realpath_mock, chmod_mock, makedirs_mock):
         self.crypt_mount_config_util.disk_util = disk_util_mock
         lock = mock.Mock()
         
