@@ -46,8 +46,11 @@ class PatchBootSystemState(OSEncryptionState):
         if not self.should_enter():
             return
 
-        # Get BEK path
-        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        # Use PassphraseManager for persistent passphrase storage
+        from handle import get_passphrase_manager
+        passphrase_manager = get_passphrase_manager()
+        volume_id = f"os_encrypt_{self.rootfs_block_device.replace('/', '_')}"
+        bek_path = passphrase_manager.create_temp_passphrase_file(volume_id)
 
         # Set up luksheader
         self.command_executor.ExecuteInBash('mount /boot', False)

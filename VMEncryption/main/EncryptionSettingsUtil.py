@@ -46,8 +46,11 @@ class EncryptionSettingsUtil(object):
     def get_index(self):
         """get the integer value of the current index in the counter"""
         index = 0
-        if os.path.isfile(CommonVariables.encryption_settings_counter_path):
-            with open(CommonVariables.encryption_settings_counter_path, "r") as infile:
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        counter_path = os.path.join(tempfile.gettempdir(), CommonVariables.encryption_settings_counter_file)
+        if os.path.isfile(counter_path):
+            with open(counter_path, "r") as infile:
                 index_string = infile.readline().strip()
             try:
                 index = int(index_string)
@@ -64,7 +67,10 @@ class EncryptionSettingsUtil(object):
         # https://docs.python.org/2/library/functions.html#open
         # https://linux.die.net/man/2/fsync
         # use mode = "w" and encoding = "ascii" since writing text only
-        with open(CommonVariables.encryption_settings_counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        counter_path = os.path.join(tempfile.gettempdir(), CommonVariables.encryption_settings_counter_file)
+        with open(counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
             output = str(index + 1) + "\n"  # str allows for a python2 + python3 compatible integer to string conversion
             outfile.write(output)
             outfile.flush()

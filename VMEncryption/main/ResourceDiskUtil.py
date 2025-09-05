@@ -30,7 +30,7 @@ class ResourceDiskUtil(object):
     _RD_BASE_DEV_PATH_CACHE = ""
     DEV_DM_PREFIX = '/dev/dm-'
     # todo: consolidate this and other key file path references
-    # (PassphraseUtil.py, ExtensionParameter.py, and dracut patches)
+    # (ExtensionParameter.py, and dracut patches)
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 

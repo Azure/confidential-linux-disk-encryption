@@ -54,6 +54,7 @@ from ProcessLock import ProcessLock
 from CommandExecutor import CommandExecutor, ProcessCommunicator
 from OnlineEncryptionHandler import OnlineEncryptionHandler
 from VolumeNotificationService import VolumeNotificationService
+from PassphraseManager import PassphraseManager
 from io import open
 
 # Global variables
@@ -63,20 +64,14 @@ DistroPatcher = None
 encryption_environment = None
 security_Type = None
 vns_call = None
-DistroPatcher = None
-encryption_environment = None
-security_Type = None
-vns_call = None
+passphrase_manager = None
 
 def generate_passphrase():
     """Generate a random passphrase"""
-    if TestHooks.use_hard_code_passphrase:
-        return TestHooks.hard_code_passphrase
-    else:
-        with open("/dev/urandom", "rb") as _random_source:
-            bytes = _random_source.read(CommonVariables.PassphraseLengthInBytes)
-            passphrase_generated = base64.b64encode(bytes)
-        return passphrase_generated
+    with open("/dev/urandom", "rb") as _random_source:
+        bytes = _random_source.read(CommonVariables.PassphraseLengthInBytes)
+        passphrase_generated = base64.b64encode(bytes)
+    return passphrase_generated
 
 def create_temp_passphrase_file(passphrase):
     """Create a temporary file with the passphrase for cryptsetup"""
@@ -84,6 +79,13 @@ def create_temp_passphrase_file(passphrase):
     temp_file.write(passphrase)
     temp_file.close()
     return temp_file.name
+
+def get_passphrase_manager():
+    """Get or create PassphraseManager instance"""
+    global passphrase_manager
+    if passphrase_manager is None:
+        passphrase_manager = PassphraseManager(logger, encryption_environment)
+    return passphrase_manager
 
 
 def install():
@@ -553,6 +555,12 @@ def mount_encrypted_disks(disk_util, crypt_mount_config_util, passphrase_file, e
     if security_Type == CommonVariables.ConfidentialVM:
         logger.log("retaining the mountpoint.")
         retain_mountpoint = True
+    
+    # Use PassphraseManager for resource disk if no passphrase_file provided
+    if passphrase_file is None:
+        passphrase_manager = get_passphrase_manager()
+        passphrase_file = passphrase_manager.create_temp_passphrase_file("resource_disk")
+    
     resource_disk_util = ResourceDiskUtil(logger, disk_util, crypt_mount_config_util, passphrase_file, get_public_settings(), DistroPatcher.distro_info,retain_mountpoint)
     if encryption_config.config_file_exists():
         volume_type = encryption_config.get_volume_type().lower()
@@ -745,7 +753,8 @@ def enable():
         # Mount already encrypted disks before running fatal prechecks
         disk_util = DiskUtil(hutil=hutil, patching=DistroPatcher, logger=logger, encryption_environment=encryption_environment)
         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
-        # No BEK functionality - no persistent passphrase utility needed
+        # Initialize PassphraseManager for persistent passphrase storage
+        passphrase_manager = get_passphrase_manager()
         existing_passphrase_file = None
         existing_volume_type = None
         encryption_config = EncryptionConfig(encryption_environment=encryption_environment, logger=logger)
@@ -763,18 +772,19 @@ def enable():
             if public_settings.get(CommonVariables.MigrateKey) == CommonVariables.MigrateValue:
                 is_migrate_operation = True
 
-        # No BEK functionality - no persistent passphrase files
+        # Use PassphraseManager for persistent passphrase storage
         existing_passphrase_file = None
         if ResourceDiskUtil.RD_MAPPER_NAME in [ci.mapper_name for ci in crypt_mount_config_util.get_crypt_items()]:
-            # If there are crypt items, generate a temporary passphrase for mounting
-            generated_passphrase = generate_passphrase()
-            generated_passphrase_file = create_temp_passphrase_file(generated_passphrase)
-            mount_encrypted_disks(disk_util=disk_util,
-                                  crypt_mount_config_util=crypt_mount_config_util,
-                                  encryption_config=encryption_config,
-                                  passphrase_file=generated_passphrase_file)
-            # Clean up temporary file
-            os.unlink(generated_passphrase_file)
+            # If there are crypt items, use PassphraseManager for mounting
+            passphrase_file = passphrase_manager.create_temp_passphrase_file("resource_disk")
+            try:
+                mount_encrypted_disks(disk_util=disk_util,
+                                      crypt_mount_config_util=crypt_mount_config_util,
+                                      encryption_config=encryption_config,
+                                      passphrase_file=passphrase_file)
+            finally:
+                # Clean up temporary file
+                passphrase_manager.cleanup_temp_file(passphrase_file)
         if security_Type == CommonVariables.ConfidentialVM:
             crypt_mount_config_util.device_unlock_using_luks2_header()
 
@@ -1099,9 +1109,9 @@ def enable_encryption():
                                           status=CommonVariables.extension_error_status,
                                           code=str(CommonVariables.missing_dependency),
                                           message=message)
-                        # No BEK functionality - generate temporary passphrase file
-                        passphrase = generate_passphrase()
-                        passphrase_file = create_temp_passphrase_file(passphrase)
+                        # Use PassphraseManager for persistent passphrase storage
+                        passphrase_manager = get_passphrase_manager()
+                        passphrase_file = passphrase_manager.create_temp_passphrase_file("resource_disk")
                         crypt_mount_config_util = CryptMountConfigUtil(logger=logger, encryption_environment=encryption_environment, disk_util=disk_util)
                         retain_mountpoint = False
                         if security_Type == CommonVariables.ConfidentialVM:
