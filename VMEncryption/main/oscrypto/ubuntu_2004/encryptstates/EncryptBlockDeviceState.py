@@ -17,6 +17,8 @@
 
 import os
 import sys
+import tempfile
+import base64
 
 from inspect import ismethod
 from time import sleep
@@ -25,6 +27,23 @@ from OSEncryptionState import *
 class EncryptBlockDeviceState(OSEncryptionState):
     def __init__(self, context):
         super(EncryptBlockDeviceState, self).__init__('EncryptBlockDeviceState', context)
+    
+    def generate_passphrase(self):
+        """Generate a random passphrase"""
+        if TestHooks.use_hard_code_passphrase:
+            return TestHooks.hard_code_passphrase
+        else:
+            with open("/dev/urandom", "rb") as _random_source:
+                bytes = _random_source.read(CommonVariables.PassphraseLengthInBytes)
+                passphrase_generated = base64.b64encode(bytes)
+            return passphrase_generated
+    
+    def create_temp_passphrase_file(self, passphrase):
+        """Create a temporary file with the passphrase for cryptsetup"""
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
+        temp_file.write(passphrase)
+        temp_file.close()
+        return temp_file.name
 
     def should_enter(self):
         self.context.logger.log("Verifying if machine should enter encrypt_block_device state")
@@ -85,5 +104,12 @@ class EncryptBlockDeviceState(OSEncryptionState):
         if not ismethod(callback_method):
             raise Exception("{0} is not a method".format(callback_method_name))
 
-        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
-        callback_method(bek_path)        
+        # Use PassphraseManager for persistent passphrase storage
+        from handle import get_passphrase_manager
+        passphrase_manager = get_passphrase_manager()
+        volume_id = f"os_encrypt_{self.rootfs_block_device.replace('/', '_')}"
+        bek_path = passphrase_manager.create_temp_passphrase_file(volume_id)
+        try:
+            callback_method(bek_path)
+        finally:
+            passphrase_manager.cleanup_temp_file(bek_path)        

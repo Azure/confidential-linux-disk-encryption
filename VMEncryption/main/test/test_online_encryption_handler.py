@@ -83,7 +83,6 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
         mock_disk_util.umount.return_value = CommonVariables.success
         
         mock_crypt_mount_config_util = Mock()
-        mock_bek_util = Mock()
         passphrase_file = "/path/to/passphrase"
         
         with patch.object(self.handler.command_executor, 'ExecuteInBash', return_value=CommonVariables.success):
@@ -96,8 +95,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
                     [device_item], 
                     passphrase_file, 
                     mock_disk_util, 
-                    mock_crypt_mount_config_util, 
-                    mock_bek_util
+                    mock_crypt_mount_config_util
                 )
                 
                 # Verify calls
@@ -119,7 +117,6 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
         
         mock_disk_util = Mock()
         mock_crypt_mount_config_util = Mock()
-        mock_bek_util = Mock()
         passphrase_file = "/path/to/passphrase"
         
         # Call the method
@@ -127,8 +124,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
             [device_item], 
             passphrase_file, 
             mock_disk_util, 
-            mock_crypt_mount_config_util, 
-            mock_bek_util
+            mock_crypt_mount_config_util
         )
         
         # Verify error was logged and device returned
@@ -150,7 +146,6 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
         mock_disk_util.umount.return_value = 1  # Failure
         
         mock_crypt_mount_config_util = Mock()
-        mock_bek_util = Mock()
         passphrase_file = "/path/to/passphrase"
         
         # Call the method
@@ -158,8 +153,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
             [device_item], 
             passphrase_file, 
             mock_disk_util, 
-            mock_crypt_mount_config_util, 
-            mock_bek_util
+            mock_crypt_mount_config_util
         )
         
         # Verify error was logged and device returned
@@ -182,7 +176,6 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
         mock_disk_util.check_shrink_fs.return_value = 1  # Failure
         
         mock_crypt_mount_config_util = Mock()
-        mock_bek_util = Mock()
         passphrase_file = "/path/to/passphrase"
         
         # Call the method
@@ -190,8 +183,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
             [device_item], 
             passphrase_file, 
             mock_disk_util, 
-            mock_crypt_mount_config_util, 
-            mock_bek_util
+            mock_crypt_mount_config_util
         )
         
         # Verify error was logged and device returned
@@ -215,7 +207,6 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
         mock_disk_util.check_shrink_fs.return_value = CommonVariables.process_success
         
         mock_crypt_mount_config_util = Mock()
-        mock_bek_util = Mock()
         passphrase_file = "/path/to/passphrase"
         
         with patch.object(self.handler.command_executor, 'ExecuteInBash', return_value=1):  # Failure
@@ -224,8 +215,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
                 [device_item], 
                 passphrase_file, 
                 mock_disk_util, 
-                mock_crypt_mount_config_util, 
-                mock_bek_util
+                mock_crypt_mount_config_util
             )
             
             # Verify error was logged and device returned
@@ -255,7 +245,6 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
         mock_disk_util.check_shrink_fs.return_value = CommonVariables.process_success
         
         mock_crypt_mount_config_util = Mock()
-        mock_bek_util = Mock()
         passphrase_file = "/path/to/passphrase"
         
         with patch.object(handler.command_executor, 'ExecuteInBash', return_value=CommonVariables.success):
@@ -268,8 +257,7 @@ class TestOnlineEncryptionHandler(unittest.TestCase):
                     [device_item], 
                     passphrase_file, 
                     mock_disk_util, 
-                    mock_crypt_mount_config_util, 
-                    mock_bek_util
+                    mock_crypt_mount_config_util
                 )
                 
                 # Verify update_crypttab_and_fstab was called with passphrase file

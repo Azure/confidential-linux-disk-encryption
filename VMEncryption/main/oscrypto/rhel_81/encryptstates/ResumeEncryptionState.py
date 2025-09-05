@@ -47,7 +47,11 @@ class ResumeEncryptionState(OSEncryptionState):
         if not self.should_enter():
             return
 
-        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        # Use PassphraseManager for persistent passphrase storage
+        from handle import get_passphrase_manager
+        passphrase_manager = get_passphrase_manager()
+        volume_id = f"os_encrypt_{self.rootfs_block_device.replace('/', '_')}"
+        bek_path = passphrase_manager.create_temp_passphrase_file(volume_id)
 
         crypt_item = CryptItem()
         crypt_item.dev_path = self.rootfs_block_device

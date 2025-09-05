@@ -87,8 +87,15 @@ class EncryptBlockDeviceState(OSEncryptionState):
         if not ismethod(callback_method):
             raise Exception("{0} is not a method".format(callback_method_name))
 
-        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
-        callback_method(bek_path)    
+        # Use PassphraseManager for persistent passphrase storage
+        from handle import get_passphrase_manager
+        passphrase_manager = get_passphrase_manager()
+        volume_id = f"os_encrypt_{self.rootfs_block_device.replace('/', '_')}"
+        bek_path = passphrase_manager.create_temp_passphrase_file(volume_id)
+        try:
+            callback_method(bek_path)
+        finally:
+            passphrase_manager.cleanup_temp_file(bek_path)    
 
     def _get_root_fs_size_in_sectors(self, sector_size):
         proc_comm = ProcessCommunicator()

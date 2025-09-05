@@ -173,8 +173,9 @@ class UbuntuPatching(AbstractPatching):
             self.logger.log('osencrypt entry not present or already updated or expected root partition link does not exists.')
 
     def _get_stable_os_disk_path(self):
-        gen1_disk = os.path.join(CommonVariables.azure_symlinks_dir, "root-part1")
-        gen2_disk = os.path.join(CommonVariables.azure_symlinks_dir, "scsi0/lun0-part1")
+        # Use forward slashes for Linux-only codebase
+        gen1_disk = f"{CommonVariables.azure_symlinks_dir}/root-part1"
+        gen2_disk = f"{CommonVariables.azure_symlinks_dir}/scsi0/lun0-part1"
         if os.path.exists(gen1_disk):
             return gen1_disk
         elif os.path.exists(gen2_disk):

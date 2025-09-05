@@ -75,8 +75,6 @@ class UnmountOldrootState(OSEncryptionState):
 
         self.command_executor.Execute('swapoff -a', True)
 
-        self.bek_util.umount_azure_passhprase(self.encryption_config, force=True)
-
         if os.path.exists("/oldroot/mnt/resource"):
             self.command_executor.Execute('umount /oldroot/mnt/resource')
 

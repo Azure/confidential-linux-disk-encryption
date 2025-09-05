@@ -36,16 +36,18 @@ class CommonVariables:
     wire protocol message format
     """
     encryption_key_file_name = 'LinuxPassPhraseFileName'
-    encryption_key_mount_point = '/mnt/azure_bek_disk'
-    bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
-    bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
+    # No BEK functionality - use temporary directory instead
+    encryption_key_mount_point = '/tmp/azure_encryption_temp'
+    bek_fstab_line_template = ''  # No BEK volume fstab entries needed
+    bek_fstab_line_template_ubuntu_14 = ''  # No BEK volume fstab entries needed
     etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'
     osencrypt_crypttab_line_ubuntu = 'osencrypt {0} none luks,discard,header=/boot/luks/osluksheader,keyscript=/usr/sbin/azure_crypt_key.sh\n'
     encryption_algorithms = ['RSA-OAEP', 'RSA-OAEP-256', 'RSA1_5']
     default_encryption_algorithm = 'RSA-OAEP'
     encryption_settings_file_name_pattern = 'settings_{0}.json'
     encryption_settings_counter_file = 'counter.txt'
-    encryption_settings_counter_path = encryption_key_mount_point + '/' + encryption_settings_counter_file
+    # No BEK functionality - counter path will be set dynamically using temp directory
+    encryption_settings_counter_path = None
 
     """
     Secure Key release for CVM

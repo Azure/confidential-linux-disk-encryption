@@ -20,7 +20,6 @@ import hashlib
 import xml.parsers.expat
 
 from DiskUtil import DiskUtil
-from BekUtil import BekUtil
 from EncryptionConfig import EncryptionConfig
 from Utils import HandlerUtil
 from Common import *
@@ -48,7 +47,7 @@ class ExtensionParameter(object):
         self.encryption_environment = encryption_environment
 
         self.disk_util = DiskUtil(hutil=hutil, patching=distro_patcher, logger=logger, encryption_environment=encryption_environment)
-        self.bek_util = BekUtil(self.disk_util, logger,encryption_environment)
+    
         self.encryption_config = EncryptionConfig(encryption_environment, logger)
 
         self.command = public_settings.get(CommonVariables.EncryptionEncryptionOperationKey)
@@ -218,11 +217,9 @@ class ExtensionParameter(object):
             self.logger.log('Current config KeyStoreType {0} differs from effective config KeyStoreType {1}'.format(self.KeyStoreType, self.get_keystore_type()))
             return True
 
-        bek_passphrase_file_name = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        # No BEK functionality - no persistent passphrase files
+        bek_passphrase_file_name = None
         bek_passphrase = None
-        if bek_passphrase_file_name is not None and os.path.exists(bek_passphrase_file_name):
-            with open(bek_passphrase_file_name) as bek_passphrase_file:
-                bek_passphrase = bek_passphrase_file.read()
 
         if (self.passphrase and bek_passphrase) and \
            (self.passphrase != bek_passphrase):

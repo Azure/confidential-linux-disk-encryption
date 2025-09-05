@@ -55,17 +55,27 @@ class CryptMountConfigUtil(object):
         self.disk_util = disk_util
         self.command_executor = CommandExecutor(self.logger)
 
-    def get_key_file_path(self,devpath,key_mount_point=CommonVariables.encryption_key_mount_point):
-            key_file = ""
-         # get the scsi and lun number for the dev_path of this crypt_item
-            scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(devpath)])
-            if len(scsi_lun_numbers) == 0:
-                # The default in case we didn't get any scsi/lun numbers
-                key_file = os.path.join(key_mount_point, self.encryption_environment.default_bek_filename)
-            else:
-                scsi_controller, lun_number = scsi_lun_numbers[0]
-                key_file = os.path.join(key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))
-            return key_file
+    def get_key_file_path(self,devpath,key_mount_point=None):
+            # Use PassphraseManager for persistent passphrase storage
+            from handle import get_passphrase_manager
+            passphrase_manager = get_passphrase_manager()
+            
+            # Generate volume ID based on device path
+            volume_id = f"data_vol_{devpath.replace('/', '_').replace('dev_', '')}"
+            
+            # If custom key_mount_point is provided, use it instead of PassphraseManager
+            if key_mount_point:
+                # Legacy behavior for backward compatibility (Linux-only)
+                scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(devpath)])
+                if len(scsi_lun_numbers) == 0:
+                    key_file = f"{key_mount_point}/{self.encryption_environment.default_bek_filename}"
+                else:
+                    scsi_controller, lun_number = scsi_lun_numbers[0]
+                    key_file = f"{key_mount_point}/{CommonVariables.encryption_key_file_name}_{scsi_controller}_{lun_number}"
+                return key_file
+            
+            # Return the persistent passphrase file path
+            return passphrase_manager.get_passphrase_file_path(volume_id)
     
     def parse_crypttab_line(self, line):
         crypttab_parts = line.strip().split()
@@ -513,12 +523,16 @@ class CryptMountConfigUtil(object):
         else:
             # get the scsi and lun number for the dev_path of this crypt_item
             scsi_lun_numbers = self.disk_util.get_azure_data_disk_controller_and_lun_numbers([os.path.realpath(crypt_item.dev_path)])
-            if len(scsi_lun_numbers) == 0:
-                # The default in case we didn't get any scsi/lun numbers
-                key_file = os.path.join(CommonVariables.encryption_key_mount_point, self.encryption_environment.default_bek_filename)
-            else:
-                scsi_controller, lun_number = scsi_lun_numbers[0]
-                key_file = os.path.join(CommonVariables.encryption_key_mount_point, CommonVariables.encryption_key_file_name + "_" + str(scsi_controller) + "_" + str(lun_number))                  
+            # Use PassphraseManager for persistent passphrase storage
+            from handle import get_passphrase_manager
+            passphrase_manager = get_passphrase_manager()
+            
+            # Generate volume ID based on device path
+            # Convert /dev/dev_path to data_vol__dev_path
+            volume_id = f"data_vol_{crypt_item.dev_path.replace('/', '_')}"
+            
+            # Return the persistent passphrase file path
+            key_file = passphrase_manager.get_passphrase_file_path(volume_id)                  
             
         crypttab_line = "{0} {1} {2} luks,nofail".format(crypt_item.mapper_name, crypt_item.dev_path, key_file)
         if crypt_item.luks_header_path and str(crypt_item.luks_header_path) != "None":
@@ -547,7 +561,8 @@ class CryptMountConfigUtil(object):
                 wf.writelines(crypttab_lines)
 
         if backup_folder is not None:
-            crypttab_backup_file = os.path.join(backup_folder, "crypttab_line")
+            # Use forward slashes for Linux-only codebase
+            crypttab_backup_file = f"{backup_folder}/crypttab_line"
             self.disk_util.make_sure_path_exists(backup_folder)
             with open(crypttab_backup_file, "w") as wf:
                 wf.write(crypttab_line)
@@ -562,7 +577,8 @@ class CryptMountConfigUtil(object):
                         if mountpoint == crypt_item.mount_point and crypt_item.mapper_name in device:
                             fstab_backup_line = line
                 if fstab_backup_line is not None:
-                    fstab_backup_file = os.path.join(backup_folder, "fstab_line")
+                    # Use forward slashes for Linux-only codebase
+                    fstab_backup_file = f"{backup_folder}/fstab_line"
                     with open(fstab_backup_file, "w") as wf:
                         wf.write(fstab_backup_line)
                     self.logger.log("Added fstab item {0} to {1}".format(fstab_backup_line, fstab_backup_file))
@@ -666,10 +682,7 @@ class CryptMountConfigUtil(object):
             wf.write(mount_content_item)
 
     def is_bek_in_fstab_file(self, lines):
-        for line in lines:
-            fstab_device, fstab_mount_point, fstab_fs, fstab_opts = self.parse_fstab_line(line)
-            if fstab_mount_point and os.path.normpath(fstab_mount_point) == os.path.normpath(CommonVariables.encryption_key_mount_point):
-                return True
+        # No BEK functionality - always return False
         return False
 
     def parse_fstab_line(self, line):
@@ -747,18 +760,12 @@ class CryptMountConfigUtil(object):
                 f.write(relevant_line)
 
     def get_fstab_bek_line(self):
-        if self.disk_util.distro_patcher.distro_info[0].lower() == 'ubuntu' and self.disk_util.distro_patcher.distro_info[1].startswith('14'):
-            return CommonVariables.bek_fstab_line_template_ubuntu_14.format(CommonVariables.encryption_key_mount_point)
-        else:
-            return CommonVariables.bek_fstab_line_template.format(CommonVariables.encryption_key_mount_point)
+        # No BEK functionality - return empty string
+        return ""
 
     def add_bek_to_default_cryptdisks(self):
-        if os.path.exists("/etc/default/cryptdisks"):
-            with open("/etc/default/cryptdisks", 'r') as f:
-                lines = f.readlines()
-            if not any(["azure_bek_disk" in line for line in lines]):
-                with open("/etc/default/cryptdisks", 'a') as f:
-                    f.write(CommonVariables.etc_defaults_cryptdisks_line.format(CommonVariables.encryption_key_mount_point))
+        # No BEK functionality - no-op
+        pass
 
     def remove_mount_info(self, mount_point):
         if not mount_point:
@@ -896,7 +903,8 @@ class CryptMountConfigUtil(object):
                     continue
                 self.logger.log(msg="Adding entry for {0} drive in fstab with mount point {1}".format(crypt_item.mapper_name, crypt_item.mount_point), level=CommonVariables.InfoLevel)
                 self.append_mount_info_data_disk(os.path.join(CommonVariables.dev_mapper_root, crypt_item.mapper_name), crypt_item.mount_point)
-                backup_folder = os.path.join(crypt_item.mount_point, ".azure_ade_backup_mount_info/")
+                # Use forward slashes for Linux-only codebase
+                backup_folder = f"{crypt_item.mount_point}/.azure_ade_backup_mount_info"
                 self.add_crypt_item_to_crypttab(crypt_item, backup_folder=backup_folder)
             else:
                 self.logger.log("Mapper name or mount point not available. Cannot migrate it to crypttab")
@@ -910,12 +918,5 @@ class CryptMountConfigUtil(object):
             self.logger.log(msg=("the azure crypt mount file not exist: {0}".format(self.encryption_environment.azure_crypt_mount_config_path)), level=CommonVariables.InfoLevel)
 
     def add_bek_in_fstab(self):
-        with open('/etc/fstab', 'r') as f:
-            lines = f.readlines()
-        
-        if not self.is_bek_in_fstab_file(lines):
-            self.logger.log("BEK volume not detected in fstab. Adding it now.")
-            lines.append(self.get_fstab_bek_line())
-            self.add_bek_to_default_cryptdisks()
-            with open('/etc/fstab', 'w') as f:
-                f.writelines(lines)
+        # No BEK functionality - no-op
+        pass

@@ -8,7 +8,6 @@ except ImportError:
 
 from DiskUtil import DiskUtil
 from CryptMountConfigUtil import CryptMountConfigUtil
-from BekUtil import BekUtil
 from Common import CommonVariables, CryptItem, DeviceItem
 from CommandExecutor import CommandExecutor
 from OnlineEncryptionResumer import OnlineEncryptionResumer
@@ -28,7 +27,7 @@ class OnlineEncryptionHandler:
         self.security_type = security_type
         self.public_setting = public_setting
 
-    def handle(self, device_items_to_encrypt, passphrase_file, disk_util, crypt_mount_config_util, bek_util):
+    def handle(self, device_items_to_encrypt, passphrase_file, disk_util, crypt_mount_config_util):
         for device_item in device_items_to_encrypt:
             self.logger.log("Setting up device " + device_item.name)
             device_fs = device_item.file_system.lower()

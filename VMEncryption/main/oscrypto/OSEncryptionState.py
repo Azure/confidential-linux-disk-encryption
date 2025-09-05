@@ -27,7 +27,6 @@ from uuid import UUID
 
 from Common import *
 from CommandExecutor import *
-from BekUtil import *
 from DiskUtil import *
 from CryptMountConfigUtil import *
 from EncryptionConfig import *
@@ -53,9 +52,6 @@ class OSEncryptionState(object):
                                                             encryption_environment=self.context.encryption_environment,
                                                             disk_util=self.disk_util)
 
-        self.bek_util = BekUtil(disk_util=self.disk_util,
-                                logger=self.context.logger,
-                                encryption_environment=self.context.encryption_environment)
 
         self.encryption_config = EncryptionConfig(encryption_environment=self.context.encryption_environment,
                                                   logger=self.context.logger)

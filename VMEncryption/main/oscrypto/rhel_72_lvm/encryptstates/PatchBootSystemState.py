@@ -310,5 +310,9 @@ class PatchBootSystemState(OSEncryptionState):
         if not ismethod(callback_method):
             raise Exception("{0} is not a method".format(callback_method_name))
 
-        bek_path = self.bek_util.get_bek_passphrase_file(self.encryption_config)
+        # Use PassphraseManager for persistent passphrase storage
+        from handle import get_passphrase_manager
+        passphrase_manager = get_passphrase_manager()
+        volume_id = f"os_encrypt_{self.rootfs_block_device.replace('/', '_')}"
+        bek_path = passphrase_manager.create_temp_passphrase_file(volume_id)
         callback_method(bek_path)

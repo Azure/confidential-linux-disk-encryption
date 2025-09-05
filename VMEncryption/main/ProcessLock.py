@@ -21,7 +21,7 @@ try:
     import fcntl
     FCNTL_AVAILABLE = True
 except ImportError:
-    # fcntl is not available on Windows
+    # fcntl is Linux-specific
     FCNTL_AVAILABLE = False
     
 from Common import CommonVariables
@@ -35,7 +35,7 @@ class ProcessLock(object):
 
     def try_lock(self):
         if not FCNTL_AVAILABLE:
-            self.logger.log("fcntl not available (likely Windows environment), skipping file locking")
+            self.logger.log("fcntl not available (non-Linux environment), skipping file locking")
             return True
             
         try:

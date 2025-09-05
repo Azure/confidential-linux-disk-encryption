@@ -30,7 +30,7 @@ class ResourceDiskUtil(object):
     _RD_BASE_DEV_PATH_CACHE = ""
     DEV_DM_PREFIX = '/dev/dm-'
     # todo: consolidate this and other key file path references
-    # (BekUtil.py, ExtensionParameter.py, and dracut patches)
+    # (ExtensionParameter.py, and dracut patches)
     RD_MAPPER_NAME = 'resourceencrypt'
     RD_MAPPER_PATH = os.path.join(CommonVariables.dev_mapper_root, RD_MAPPER_NAME)
 
@@ -163,11 +163,9 @@ class ResourceDiskUtil(object):
     def _unmount_resource_disk(self):
         """ unmount resource disk """
         self.disk_util.umount(self.RD_MOUNT_POINT)
-        self.disk_util.umount(CommonVariables.encryption_key_mount_point)
         self.disk_util.umount('/mnt')
         self._try_unmount_lxd()
-        self.disk_util.make_sure_path_exists(CommonVariables.encryption_key_mount_point)
-        self.disk_util.mount_by_label("BEK VOLUME", CommonVariables.encryption_key_mount_point, "fmask=077")
+        # No BEK functionality - no BEK volume mounting needed
 
     def _is_plain_mounted(self):
         """ return true if mount point is mounted from a non-crypt layer """
@@ -330,9 +328,7 @@ class ResourceDiskUtil(object):
         with open("/etc/fstab") as f:
             lines = f.readlines()
 
-        if not self.crypt_mount_config_util.is_bek_in_fstab_file(lines):
-            lines.append(self.crypt_mount_config_util.get_fstab_bek_line())
-            self.crypt_mount_config_util.add_bek_to_default_cryptdisks()
+        # No BEK functionality - no BEK volume fstab entries needed
 
         if not any([line.startswith(self.RD_MAPPER_PATH) for line in lines]):
             if self.distro_info[0].lower() == 'ubuntu' and self.distro_info[1].startswith('14'):

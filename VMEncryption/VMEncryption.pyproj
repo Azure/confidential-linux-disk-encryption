@@ -39,7 +39,7 @@
     <Content Include="main\oscrypto\91ade\parse-crypt-ade.sh" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="main\BekUtil.py">
+    <Compile Include="main\PassphraseUtil.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="main\check_util.py" />

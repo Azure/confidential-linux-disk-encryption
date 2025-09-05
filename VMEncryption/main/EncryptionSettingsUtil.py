@@ -46,8 +46,11 @@ class EncryptionSettingsUtil(object):
     def get_index(self):
         """get the integer value of the current index in the counter"""
         index = 0
-        if os.path.isfile(CommonVariables.encryption_settings_counter_path):
-            with open(CommonVariables.encryption_settings_counter_path, "r") as infile:
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        counter_path = os.path.join(tempfile.gettempdir(), CommonVariables.encryption_settings_counter_file)
+        if os.path.isfile(counter_path):
+            with open(counter_path, "r") as infile:
                 index_string = infile.readline().strip()
             try:
                 index = int(index_string)
@@ -64,7 +67,10 @@ class EncryptionSettingsUtil(object):
         # https://docs.python.org/2/library/functions.html#open
         # https://linux.die.net/man/2/fsync
         # use mode = "w" and encoding = "ascii" since writing text only
-        with open(CommonVariables.encryption_settings_counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        counter_path = os.path.join(tempfile.gettempdir(), CommonVariables.encryption_settings_counter_file)
+        with open(counter_path, mode="w", buffering=0, encoding="ascii") as outfile:
             output = str(index + 1) + "\n"  # str allows for a python2 + python3 compatible integer to string conversion
             outfile.write(output)
             outfile.flush()
@@ -80,7 +86,9 @@ class EncryptionSettingsUtil(object):
 
     def create_protector_file(self, existing_passphrase_file, protector_name):
         """create temporary protector file corresponding to protector name"""
-        dst = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        dst = os.path.join(tempfile.gettempdir(), protector_name)
         copyfile(existing_passphrase_file, dst)
         import ctypes
         libc = ctypes.CDLL("libc.so.6")
@@ -89,12 +97,16 @@ class EncryptionSettingsUtil(object):
 
     def remove_protector_file(self, protector_name):
         """remove temporary protector file corresponding to protector name parameter"""
-        os.remove(os.path.join(CommonVariables.encryption_key_mount_point, protector_name))
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        os.remove(os.path.join(tempfile.gettempdir(), protector_name))
         return
 
     def get_settings_file_path(self):
         """get the full path to the current encryption settings file"""
-        return os.path.join(CommonVariables.encryption_key_mount_point, self.get_settings_file_name())
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        return os.path.join(tempfile.gettempdir(), self.get_settings_file_name())
 
     def get_settings_file_name(self):
         """get the base file name of the current encryption settings file"""
@@ -298,7 +310,9 @@ class EncryptionSettingsUtil(object):
                     }]
                 })
 
-        full_protector_path = os.path.join(CommonVariables.encryption_key_mount_point, protector_name)
+        # No BEK functionality - use temporary directory instead
+        import tempfile
+        full_protector_path = os.path.join(tempfile.gettempdir(), protector_name)
         # b64encode takes a bytes like object, so read as binary data
         with open(full_protector_path, "rb") as protector_file:
             protector_data = protector_file.read()
