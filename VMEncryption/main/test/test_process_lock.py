@@ -35,7 +35,7 @@ class TestProcessLock(unittest.TestCase):
         
         self.assertTrue(result)
         mock_logger.log.assert_called_once_with(
-            "fcntl not available (likely Windows environment), skipping file locking"
+            "fcntl not available (non-Linux environment), skipping file locking"
         )
 
     def test_release_lock_fd_none(self):

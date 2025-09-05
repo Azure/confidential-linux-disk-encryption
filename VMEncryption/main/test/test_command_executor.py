@@ -22,11 +22,18 @@ class TestCommandExecutor(unittest.TestCase):
         self.sleep_cmd_long = 'sleep 15'
 
     def test_command_timeout(self):
-        # Linux-only: test command timeout
+        # Skip on Windows since this is a Linux-only codebase
+        import platform
+        if platform.system() == 'Windows':
+            self.skipTest("Linux-only codebase - skipping on Windows")
         return_code = self.cmd_executor.Execute(self.sleep_cmd_long, timeout=5)
         self.assertLess(return_code, 0, msg="The command didn't timeout as expected")
 
     def test_command_no_timeout(self):
+        # Skip on Windows since this is a Linux-only codebase
+        import platform
+        if platform.system() == 'Windows':
+            self.skipTest("Linux-only codebase - skipping on Windows")
         return_code = self.cmd_executor.Execute(self.sleep_cmd_short, timeout=10)
         self.assertEqual(return_code, 0, msg="The command should have completed successfully")
 
