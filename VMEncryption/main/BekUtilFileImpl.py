@@ -67,3 +67,27 @@ class BekUtilFileImpl(AbstractBekUtilImpl):
             self.logger.log(message)
 
         return None
+
+    def mount_bek_volume(self):
+        """
+        No-op for file-based implementation as no volume mounting is needed
+        """
+        pass
+
+    def is_bek_volume_mounted_and_formatted(self):
+        """
+        For file-based implementation, always return True as we use filesystem directly
+        """
+        return True, ""
+
+    def is_bek_disk_attached_and_partitioned(self):
+        """
+        For file-based implementation, always return True as we use filesystem directly
+        """
+        return True, ""
+
+    def umount_azure_passhprase(self, encryption_config, force=False):
+        """
+        No-op for file-based implementation as no volume unmounting is needed
+        """
+        pass
