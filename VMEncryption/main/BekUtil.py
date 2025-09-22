@@ -25,9 +25,15 @@ class BekUtil(object):
     Utility functions related to the BEK VOLUME and BEK files
     """
     def __init__(self, disk_util, logger, encryption_environment=None):
-        # Always use file-based implementation
-        logger.log("Using BEK file-based implementation")
-        self.bekUtilImpl = BekUtilFileImpl(disk_util,logger)
+        # Always use file-based implementation (volume-based implementation removed)
+        self.bekUtilImpl = BekUtilFileImpl(disk_util, logger)
+        
+        # Sanity check to ensure we're using file-based implementation
+        if not isinstance(self.bekUtilImpl, BekUtilFileImpl):
+            raise RuntimeError("Expected BekUtilFileImpl but got {0}".format(type(self.bekUtilImpl).__name__))
+        
+        logger.log("BEK utility initialized with file-based implementation (keyfile path: {0})".format(
+            getattr(self.bekUtilImpl, 'keyfilePath', 'unknown')))
 
     def generate_passphrase(self):
         return self.bekUtilImpl.generate_passphrase()
