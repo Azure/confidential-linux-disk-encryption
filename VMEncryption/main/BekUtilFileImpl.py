@@ -76,15 +76,29 @@ class BekUtilFileImpl(AbstractBekUtilImpl):
 
     def is_bek_volume_mounted_and_formatted(self):
         """
-        For file-based implementation, always return True as we use filesystem directly
+        For file-based implementation, check if the keyfile directory exists and is accessible
         """
-        return True, ""
+        try:
+            if os.path.exists(self.keyfilePath) and os.path.isdir(self.keyfilePath):
+                return True, ""
+            else:
+                return False, "BEK keyfile directory does not exist or is not accessible"
+        except Exception:
+            return False, "Error accessing BEK keyfile directory"
 
     def is_bek_disk_attached_and_partitioned(self):
         """
-        For file-based implementation, always return True as we use filesystem directly
+        For file-based implementation, check if we can create/access the keyfile directory
         """
-        return True, ""
+        try:
+            # Try to create the directory if it doesn't exist
+            self.disk_util.make_sure_path_exists(self.keyfilePath)
+            if os.path.exists(self.keyfilePath) and os.path.isdir(self.keyfilePath):
+                return True, ""
+            else:
+                return False, "Cannot create or access BEK keyfile directory"
+        except Exception:
+            return False, "Error creating BEK keyfile directory"
 
     def umount_azure_passhprase(self, encryption_config, force=False):
         """
