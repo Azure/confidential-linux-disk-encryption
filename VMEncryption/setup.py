@@ -51,22 +51,22 @@ packages_array.append(oscrypto_folder)
 
 packages_array.append(oscrypto_folder + '/rhel_81')
 packages_array.append(oscrypto_folder + '/rhel_81/encryptstates')
-packages_array.append(oscrypto_folder + '/91adeOnline')
-packages_array.append(oscrypto_folder + '/91ade')
-packages_array.append(oscrypto_folder + '/rhel_72_lvm')
-packages_array.append(oscrypto_folder + '/rhel_72_lvm/encryptstates')
-packages_array.append(oscrypto_folder + '/rhel_72')
-packages_array.append(oscrypto_folder + '/rhel_72/encryptstates')
-packages_array.append(oscrypto_folder + '/rhel_68')
-packages_array.append(oscrypto_folder + '/rhel_68/encryptstates')
-packages_array.append(oscrypto_folder + '/centos_68')
-packages_array.append(oscrypto_folder + '/centos_68/encryptstates')
+# packages_array.append(oscrypto_folder + '/91adeOnline')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/91ade')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/rhel_72_lvm')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/rhel_72_lvm/encryptstates')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/rhel_72')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/rhel_72/encryptstates')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/rhel_68')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/rhel_68/encryptstates')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/centos_68')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/centos_68/encryptstates')  # Directory does not exist
 packages_array.append(oscrypto_folder + '/ubuntu_2004')
 packages_array.append(oscrypto_folder + '/ubuntu_2004/encryptstates')
-packages_array.append(oscrypto_folder + '/ubuntu_1604')
-packages_array.append(oscrypto_folder + '/ubuntu_1604/encryptstates')
-packages_array.append(oscrypto_folder + '/ubuntu_1404')
-packages_array.append(oscrypto_folder + '/ubuntu_1404/encryptstates')
+# packages_array.append(oscrypto_folder + '/ubuntu_1604')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/ubuntu_1604/encryptstates')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/ubuntu_1404')  # Directory does not exist
+# packages_array.append(oscrypto_folder + '/ubuntu_1404/encryptstates')  # Directory does not exist
 
 six_folder = 'six'
 packages_array.append(six_folder)
@@ -217,7 +217,7 @@ final_folder_path = target_zip_file_location + target_folder_name
 copy2(main_folder+'/SupportedOS.json', final_folder_path+'/'+main_folder )
 copy2(main_folder+'/common_parameters.json', final_folder_path+'/'+main_folder )
 copytree(main_folder+'/oscrypto/ubuntu_2004/encryptscripts/', final_folder_path+'/'+main_folder+'/oscrypto/ubuntu_2004/encryptscripts/')
-copytree(main_folder+'/oscrypto/91adeOnlineUbu/', final_folder_path+'/'+main_folder+'/oscrypto/91adeOnlineUbu/')
+# copytree(main_folder+'/oscrypto/91adeOnlineUbu/', final_folder_path+'/'+main_folder+'/oscrypto/91adeOnlineUbu/')  # Directory does not exist
 #copy SKR app TODO: folder structure. 
 copy2('./AzureAttestSKR', final_folder_path+'/' )
 #temp VNS changes: folder structure. 
