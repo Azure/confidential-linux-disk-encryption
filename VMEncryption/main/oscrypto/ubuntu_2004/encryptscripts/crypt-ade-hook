@@ -21,10 +21,11 @@ esac
 
 # add /etc/fstab entries and mount point directories
 mkdir -p $DESTDIR/boot
-mkdir -p $DESTDIR/mnt/azure_bek_disk
+# File-based BEK storage - no mount point needed
+mkdir -p $DESTDIR/var/lib/azure_disk_encryption_config
 BOOTUUID=$(findmnt -fn -o UUID /boot)
 echo "/dev/disk/by-uuid/$BOOTUUID /boot ext2 defaults 0 0" >> "$DESTDIR/etc/fstab"
-echo "/dev/disk/by-label/BEK\\x20VOLUME /mnt/azure_bek_disk auto defaults 0 0" >> "$DESTDIR/etc/fstab"
+# Note: No BEK VOLUME mount needed for file-based storage
 
 # inject luks header
 mkdir -p ${DESTDIR}/boot/luks

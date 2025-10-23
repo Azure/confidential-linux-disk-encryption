@@ -332,7 +332,7 @@ class redhatPatching(AbstractPatching):
         self.add_kernelopts(additional_params)
 
         # For clarity after reboot, we should also add the correct info to crypttab
-        entry = 'osencrypt /dev/disk/by-partuuid/{0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partuuid)
+        entry = 'osencrypt /dev/disk/by-partuuid/{0} /var/lib/azure_disk_encryption_config/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partuuid)
         self.append_contents_to_file(entry, '/etc/crypttab')
 
         if is_os_disk_lvm:

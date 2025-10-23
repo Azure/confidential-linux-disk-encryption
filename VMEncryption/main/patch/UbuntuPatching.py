@@ -216,7 +216,7 @@ class UbuntuPatching(AbstractPatching):
             # add root partition UUID to boot script cryptsetup command
             self.command_executor.Execute("sed -i 's/ROOTPARTUUID/{0}/g' /usr/share/initramfs-tools/scripts/init-premount/crypt-ade-boot".format(root_partuuid), True)
             # add root partition UUID to /etc/crypttab
-            entry = 'osencrypt /dev/disk/by-partuuid/{0} /mnt/azure_bek_disk/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partuuid)
+            entry = 'osencrypt /dev/disk/by-partuuid/{0} /var/lib/azure_disk_encryption_config/LinuxPassPhraseFileName luks,discard,header=/boot/luks/osluksheader'.format(root_partuuid)
             self.append_contents_to_file(entry, '/etc/crypttab')
         else:
             message = "Failed to get root partition UUID"

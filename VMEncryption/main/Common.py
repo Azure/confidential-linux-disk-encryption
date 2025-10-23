@@ -36,7 +36,7 @@ class CommonVariables:
     wire protocol message format
     """
     encryption_key_file_name = 'LinuxPassPhraseFileName'
-    encryption_key_mount_point = '/mnt/azure_bek_disk'
+    encryption_key_mount_point = '/var/lib/azure_disk_encryption_config'
     bek_fstab_line_template = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nofail 0 0\n'
     bek_fstab_line_template_ubuntu_14 = 'LABEL=BEK\\040VOLUME {0} auto defaults,discard,nobootwait 0 0\n'
     etc_defaults_cryptdisks_line = '\nCRYPTDISKS_MOUNT="$CRYPTDISKS_MOUNT {0}"\n'

@@ -75,14 +75,11 @@ class UnmountOldrootState(OSEncryptionState):
         if os.path.exists("/oldroot/mnt"):
             self.command_executor.Execute('umount /oldroot/mnt')
 
-        if os.path.exists("/oldroot/mnt/azure_bek_disk"):
-            self.command_executor.Execute('umount /oldroot/mnt/azure_bek_disk')
+        # Note: File-based BEK storage doesn't require unmounting
+        # Old volume-based cleanup code removed as we now use /var/lib/azure_disk_encryption_config/
 
         if os.path.exists("/mnt"):
             self.command_executor.Execute('umount -R /mnt')
-
-        if os.path.exists("/mnt/azure_bek_disk"):
-            self.command_executor.Execute('umount /mnt/azure_bek_disk')
 
         proc_comm = ProcessCommunicator()
 
