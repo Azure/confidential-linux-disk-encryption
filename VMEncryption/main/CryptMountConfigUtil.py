@@ -756,7 +756,7 @@ class CryptMountConfigUtil(object):
         if os.path.exists("/etc/default/cryptdisks"):
             with open("/etc/default/cryptdisks", 'r') as f:
                 lines = f.readlines()
-            if not any(["azure_bek_disk" in line for line in lines]):
+            if not any([CommonVariables.encryption_key_mount_point in line for line in lines]):
                 with open("/etc/default/cryptdisks", 'a') as f:
                     f.write(CommonVariables.etc_defaults_cryptdisks_line.format(CommonVariables.encryption_key_mount_point))
 
