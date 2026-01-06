@@ -51,7 +51,9 @@ pub mod disk;
 pub mod error;
 pub mod handler;
 pub mod logging;
+pub mod traits;
 
 // Re-export commonly used types at the crate root
 pub use error::{Error, Result};
 pub use handler::ExtensionHandler;
+pub use traits::{CommandRunner, DiskDiscovery, EncryptionProvider, TpmProvider};
