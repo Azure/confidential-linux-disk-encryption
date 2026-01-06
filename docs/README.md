@@ -1,30 +1,47 @@
 # Documentation
 
-Welcome to the Confidential Disk Encryption Extension documentation.
+## Quick Reference
 
-## Contents
+| Topic | Description |
+|-------|-------------|
+| [Architecture](architecture.md) | System design and components |
+| [Error Codes](error-codes.md) | All CDE### error codes |
+| [Logging](logging.md) | Log configuration and locations |
+| [Testing](testing.md) | Running and writing tests |
 
-### Design
+## Operations
 
-- [Architecture](design/architecture.md) - System architecture, components, and how they interact
-- [Requirements](design/requirements.md) - Functional and non-functional requirements
-- [Linux Encryption](design/linux-encryption.md) - Linux encryption options (LUKS, cryptsetup, systemd-cryptenroll)
-- [Boot Unlock](design/boot-unlock.md) - How encrypted disks are automatically unlocked at boot (TPM, Key Vault)
-
-### Development
-
-- [Setup](development/setup.md) - How to set up your development environment
+| Topic | Description |
+|-------|-------------|
+| [Encryption](operations/encryption.md) | LUKS2 and BitLocker encryption |
+| [Boot Unlock](operations/boot-unlock.md) | TPM-based auto-unlock |
 
 ## Getting Started
 
-If you're new to the project, we recommend reading the documents in this order:
+```bash
+# Clone and build
+git clone https://github.com/Azure/confidential-linux-disk-encryption.git
+cd confidential-linux-disk-encryption
+cargo build
 
-1. **[Requirements](design/requirements.md)** - Understand what we're building and why
-2. **[Architecture](design/architecture.md)** - Learn how the system is designed
-3. **[Setup](development/setup.md)** - Get your environment ready to contribute
+# Run tests
+cargo test
 
-## Document Conventions
+# Dry run (development)
+cargo run -- dry-run
 
-- Design documents describe *what* and *why*
-- Development documents describe *how*
-- All documents should be kept up-to-date as the project evolves
+# Check prerequisites
+cargo run -- check-prereqs
+```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `install` | Validate prerequisites |
+| `enable` | Encrypt all data disks |
+| `disable` | Disable extension (disks stay encrypted) |
+| `update` | Handle version updates |
+| `uninstall` | Remove extension (disks stay encrypted) |
+| `dry-run` | Show what would be encrypted |
+| `check-prereqs` | Validate VM meets requirements |
