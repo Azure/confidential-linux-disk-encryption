@@ -5,6 +5,7 @@
 | Topic | Description |
 |-------|-------------|
 | [Architecture](architecture.md) | System design and components |
+| [Security Model](security.md) | Zero-trust key handling |
 | [Error Codes](error-codes.md) | All CDE### error codes |
 | [Logging](logging.md) | Log configuration and locations |
 | [Testing](testing.md) | Running and writing tests |
@@ -45,3 +46,7 @@ cargo run -- check-prereqs
 | `uninstall` | Remove extension (disks stay encrypted) |
 | `dry-run` | Show what would be encrypted |
 | `check-prereqs` | Validate VM meets requirements |
+
+## VM Requirements
+
+**Trusted Launch or Confidential VM required** - Standard VMs are not supported (no vTPM).

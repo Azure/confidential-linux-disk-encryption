@@ -6,25 +6,45 @@ A cross-platform Azure VM extension for confidential disk encryption, built in R
 
 ## Overview
 
-The Confidential Disk Encryption Extension automatically encrypts all data disks attached to an Azure Virtual Machine. It is deployed and managed through Azure (Portal, ARM templates, PowerShell, or Azure CLI) and uses platform-native encryption:
+The Confidential Disk Encryption Extension automatically encrypts all data disks attached to an Azure Virtual Machine using platform-native encryption with TPM-sealed keys:
 
-- **Linux**: LUKS2 via `cryptsetup`
-- **Windows**: BitLocker via `manage-bde`
+- **Linux**: LUKS2 via `cryptsetup` + TPM2
+- **Windows**: BitLocker via `manage-bde` + TPM
+
+**Requires Trusted Launch or Confidential VM** (provides vTPM).
+
+## Security
+
+This extension is designed so customers never need to trust Microsoft with their encryption keys:
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Keys generated on-VM** | Uses OS CSPRNG, never transmitted |
+| **Keys sealed to TPM** | Cannot be extracted, even by Microsoft |
+| **No key escrow** | No Key Vault, no external storage |
+| **Open source** | All code is auditable |
+
+See [Security Model](docs/security.md) for details.
 
 ## Features
 
-- **Automatic encryption**: All data disks are encrypted when the extension is enabled
-- **Cross-platform**: Supports both Linux and Windows VMs
-- **Platform-native**: Uses LUKS2 and BitLocker for maximum compatibility
-- **Centralized logging**: All operations logged via `tracing` for easy troubleshooting
-- **Idempotent**: Safe to run multiple times; already-encrypted disks are skipped
+- **Automatic encryption**: All data disks encrypted when extension is enabled
+- **Cross-platform**: Supports Linux and Windows VMs
+- **TPM-sealed keys**: Keys never leave the VM
+- **Platform-native**: Uses LUKS2 and BitLocker
+- **Idempotent**: Safe to run multiple times
+
+## VM Requirements
+
+| VM Type | Supported | Notes |
+|---------|-----------|-------|
+| Standard | ❌ | No vTPM |
+| Trusted Launch | ✅ | vTPM available |
+| Confidential | ✅ | vTPM + memory encryption |
 
 ## Installation
 
-The extension is installed via Azure, not directly by users:
-
-### Azure Portal
-Navigate to your VM → Extensions → Add → Confidential Disk Encryption
+The extension is installed via Azure:
 
 ### Azure CLI
 ```bash
@@ -36,58 +56,16 @@ az vm extension set \
   --version 1.0
 ```
 
-### PowerShell
-```powershell
-Set-AzVMExtension `
-  -ResourceGroupName "myResourceGroup" `
-  -VMName "myVM" `
-  -Name "ConfidentialDiskEncryption" `
-  -Publisher "Microsoft.Azure.Security" `
-  -TypeHandlerVersion "1.0"
-```
-
-### ARM Template
-```json
-{
-  "type": "Microsoft.Compute/virtualMachines/extensions",
-  "name": "[concat(variables('vmName'), '/ConfidentialDiskEncryption')]",
-  "apiVersion": "2021-04-01",
-  "location": "[resourceGroup().location]",
-  "properties": {
-    "publisher": "Microsoft.Azure.Security",
-    "type": "ConfidentialDiskEncryption",
-    "typeHandlerVersion": "1.0",
-    "autoUpgradeMinorVersion": true
-  }
-}
-```
-
-## How It Works
-
-1. **Azure deploys the extension** to the VM
-2. **Extension discovers** all attached disks
-3. **Data disks are identified** (OS disk and removable disks are excluded)
-4. **Each data disk is encrypted** using platform-native encryption
-5. **Status is reported** back to Azure
-
-```mermaid
-flowchart LR
-    Azure["Azure Platform"] --> Extension["Extension Handler"]
-    Extension --> Discovery["Disk Discovery"]
-    Discovery --> Filter["Filter Data Disks"]
-    Filter --> Encrypt["Encrypt Each Disk"]
-    Encrypt --> Status["Report Status"]
-    Status --> Azure
-```
+### Azure Portal
+Navigate to VM → Extensions → Add → Confidential Disk Encryption
 
 ## Development
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) 1.70 or later
-- Platform-specific:
-  - **Linux**: `cryptsetup` package
-  - **Windows**: BitLocker feature enabled
+- [Rust](https://rustup.rs/) 1.70+
+- **Linux**: `cryptsetup`, `systemd` 248+
+- **Windows**: BitLocker feature
 
 ### Building
 
@@ -95,52 +73,43 @@ flowchart LR
 cargo build --release
 ```
 
-### Testing (Dry Run)
-
-The `dry-run` command discovers disks and shows what would be encrypted, without actually performing encryption:
+### Testing
 
 ```bash
-cargo run -- dry-run
-```
-
-### Running Tests
-
-```bash
+# Run all tests
 cargo test
+
+# Dry run (shows what would be encrypted)
+cargo run -- dry-run
+
+# Check prerequisites
+cargo run -- check-prereqs
 ```
 
 ## Documentation
 
-For detailed documentation, see the [docs/](docs/README.md) folder:
+See [docs/](docs/README.md):
 
-- [Architecture](docs/design/architecture.md) - System design, components, and data flow
-- [Requirements](docs/design/requirements.md) - Functional and non-functional requirements
-- [Linux Encryption](docs/design/linux-encryption.md) - LUKS2 and cryptsetup details
-- [Development Setup](docs/development/setup.md) - Getting started with development
+| Topic | Description |
+|-------|-------------|
+| [Architecture](docs/architecture.md) | System design |
+| [Security Model](docs/security.md) | Zero-trust key handling |
+| [Error Codes](docs/error-codes.md) | CDE### error reference |
+| [Testing](docs/testing.md) | Test guide |
 
 ## Project Structure
 
 ```
 ├── src/
-│   ├── main.rs          # Extension entry point
-│   ├── lib.rs           # Library root
-│   ├── handler.rs       # Azure extension lifecycle handlers
-│   ├── logging.rs       # Centralized tracing/logging
-│   ├── error.rs         # Error types
-│   └── disk/
-│       └── mod.rs       # Disk discovery and filtering
+│   ├── main.rs          # Entry point
+│   ├── handler.rs       # Extension lifecycle
+│   ├── disk/mod.rs      # Disk discovery
+│   ├── prerequisites.rs # VM validation
+│   ├── error.rs         # Error codes
+│   └── logging.rs       # Tracing
 ├── docs/                # Documentation
-│   ├── design/          # Architecture and requirements
-│   └── development/     # Development guides
 └── tests/               # Integration tests
 ```
-
-## Log Locations
-
-| Platform | Log Path |
-|----------|----------|
-| Linux | `/var/log/azure/confidential-disk-encryption/extension.log` |
-| Windows | `C:\WindowsAzure\Logs\Plugins\ConfidentialDiskEncryption\extension.log` |
 
 ## License
 
@@ -148,4 +117,4 @@ See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome! Please see the [development setup guide](docs/development/setup.md) for getting started.
+Contributions welcome! Run `cargo test` before submitting PRs.

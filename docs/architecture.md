@@ -2,7 +2,7 @@
 
 ## Overview
 
-Azure VM extension that encrypts all data disks using platform-native encryption.
+Azure VM extension that encrypts all data disks using platform-native encryption with TPM-sealed keys.
 
 ```
 Azure Platform
@@ -14,8 +14,8 @@ Extension Handler (install/enable/disable/update/uninstall)
     ├── Disk Discovery
     └── Encryption Engine
             │
-            ├── LUKS2 (Linux)
-            └── BitLocker (Windows)
+            ├── LUKS2 + TPM (Linux)
+            └── BitLocker + TPM (Windows)
 ```
 
 ## Components
@@ -51,35 +51,45 @@ Extension Handler (install/enable/disable/update/uninstall)
 
 ## Key Management
 
+Keys are generated on-VM and sealed to the TPM:
+
 ```
 ┌─────────────────┐
-│   Extension     │
+│  Key Generation │  ← On-VM CSPRNG
 └────────┬────────┘
          │
-    ┌────┴────┐
-    ▼         ▼
-┌───────┐  ┌──────────┐
-│  TPM  │  │ Key Vault│
-└───────┘  └──────────┘
- Primary    Fallback
+         ▼
+┌─────────────────┐
+│      vTPM       │  ← Key sealed, never leaves VM
+└─────────────────┘
 ```
 
-1. **TPM (primary)**: Key sealed to VM's vTPM
-2. **Key Vault (fallback)**: For VMs without TPM
+- **No key escrow** - Microsoft never has access to keys
+- **TPM-only** - Requires Trusted Launch or Confidential VM
+- **No recovery** - If TPM fails, data is unrecoverable by design
+
+See [Security Model](security.md) for details.
 
 ## Data Flow
 
 ```
 1. Azure calls: cde enable
-2. Handler validates prerequisites
+2. Handler validates prerequisites (including TPM)
 3. Disk discovery finds data disks
 4. For each disk:
-   a. Generate encryption key
+   a. Generate encryption key on-VM
    b. Encrypt with LUKS2/BitLocker
-   c. Enroll TPM for auto-unlock
-   d. Store backup in Key Vault
+   c. Seal key to TPM
 5. Report status to Azure
 ```
+
+## VM Requirements
+
+| VM Type | Supported | Notes |
+|---------|-----------|-------|
+| Standard | ❌ | No vTPM |
+| Trusted Launch | ✅ | vTPM available |
+| Confidential | ✅ | vTPM + memory encryption |
 
 ## Files
 

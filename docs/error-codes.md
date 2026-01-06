@@ -33,17 +33,16 @@ All errors use the format `CDE###` (Confidential Disk Encryption).
 | CDE205 | CryptsetupNotFound | cryptsetup utility not found |
 | CDE206 | AutoUnlockFailed | Failed to configure automatic disk unlock |
 
-## Key Management (CDE300-399)
+## TPM Operations (CDE300-399)
 
 | Code | Name | Message |
 |------|------|---------|
-| CDE300 | KeyVaultError | Azure Key Vault operation failed |
-| CDE301 | KeyVaultAuthFailed | Failed to authenticate to Azure Key Vault |
-| CDE302 | KeyNotFound | Encryption key not found in Key Vault |
 | CDE303 | TpmError | TPM operation failed |
 | CDE304 | TpmNotAvailable | TPM device not available on this VM |
 | CDE305 | TpmEnrollmentFailed | Failed to enroll disk with TPM |
 | CDE306 | KeyGenerationFailed | Failed to generate encryption key |
+
+> **Note**: CDE300-302 are reserved.
 
 ## Configuration (CDE400-499)
 

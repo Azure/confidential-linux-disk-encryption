@@ -1,35 +1,24 @@
 # Boot-Time Disk Unlock
 
-Encrypted disks must be unlocked at boot without user interaction.
+Encrypted disks are automatically unlocked at boot using TPM-sealed keys.
 
-## Strategy
+## Requirements
 
-```
-┌─────────────────┐
-│   VM Boot       │
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    ▼         ▼
-┌───────┐  ┌──────────┐
-│  TPM  │  │ Key Vault│
-└───────┘  └──────────┘
- Primary    Fallback
-```
+| Platform | Requirements |
+|----------|--------------|
+| Linux | systemd 248+, vTPM (`/dev/tpm0`), LUKS2 |
+| Windows | vTPM, BitLocker enabled |
+
+**VM Type**: Trusted Launch or Confidential VM required (provides vTPM)
 
 ## Linux (systemd-cryptenroll + TPM2)
-
-### Requirements
-- systemd 248+
-- TPM2 device (`/dev/tpm0` or `/dev/tpmrm0`)
-- LUKS2 formatted disk
 
 ### Enrollment
 ```bash
 # Enroll TPM2 for auto-unlock
 systemd-cryptenroll --tpm2-device=auto /dev/sdb
 
-# Verify
+# Verify enrollment
 systemd-cryptenroll /dev/sdb
 ```
 
@@ -38,36 +27,62 @@ systemd-cryptenroll /dev/sdb
 2. TPM2 unseals the key (requires same boot chain)
 3. Disk unlocked automatically
 
-### Fallback
-If TPM unavailable:
-1. Extension stores key in Azure Key Vault
-2. Boot script fetches key via managed identity
-3. Manual unlock with fetched key
+### Verification
+```bash
+# Check TPM is available
+ls /dev/tpm*
+
+# Check disk enrollment
+systemd-cryptenroll /dev/sdb
+```
 
 ## Windows (BitLocker + TPM)
 
-### Requirements
-- TPM 1.2+ (TPM 2.0 recommended)
-- BitLocker enabled
-
 ### Enrollment
 ```powershell
-# TPM protector (auto-unlock)
-Add-BitLockerKeyProtector -MountPoint "D:" -TpmProtector
-
-# Recovery key (backup to Key Vault)
-Add-BitLockerKeyProtector -MountPoint "D:" -RecoveryPasswordProtector
+# Enable BitLocker with TPM protector
+Enable-BitLocker -MountPoint "D:" -TpmProtector
 ```
 
 ### Boot Process
-1. Boot loader measures system state
+1. Boot loader measures system state to TPM PCRs
 2. TPM unseals BitLocker key
 3. Disk unlocked automatically
 
-## Confidential VM Considerations
+### Verification
+```powershell
+# Check TPM status
+Get-Tpm
 
-| VM Type | TPM Available | Notes |
-|---------|--------------|-------|
-| Standard | No | Use Key Vault fallback |
-| Trusted Launch | Yes (vTPM) | Full auto-unlock |
-| Confidential | Yes (vTPM) | Key bound to VM attestation |
+# Check BitLocker status
+manage-bde -status D:
+```
+
+## No TPM = No Encryption
+
+VMs without vTPM cannot use this extension:
+
+| VM Type | vTPM | Supported |
+|---------|------|-----------|
+| Standard | ❌ | ❌ |
+| Trusted Launch | ✅ | ✅ |
+| Confidential | ✅ | ✅ |
+
+If TPM is not available, the extension fails with error `CDE304: TPM device not available`.
+
+## Key Recovery
+
+**There is no automatic recovery mechanism.**
+
+- If TPM fails → data is unrecoverable
+- If VM is re-imaged → data is unrecoverable
+- If boot chain changes → TPM refuses to unseal
+
+This is by design - keys never leave the VM. See [Security Model](../security.md).
+
+### Customer Options
+
+If backup is needed, customers must:
+1. Export LUKS recovery key before TPM enrollment
+2. Store recovery key in their own Key Vault
+3. Manage recovery themselves
