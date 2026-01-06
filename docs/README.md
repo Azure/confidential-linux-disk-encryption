@@ -9,6 +9,7 @@ Welcome to the Confidential Disk Encryption Extension documentation.
 - [Architecture](design/architecture.md) - System architecture, components, and how they interact
 - [Requirements](design/requirements.md) - Functional and non-functional requirements
 - [Linux Encryption](design/linux-encryption.md) - Linux encryption options (LUKS, cryptsetup, systemd-cryptenroll)
+- [Boot Unlock](design/boot-unlock.md) - How encrypted disks are automatically unlocked at boot (TPM, Key Vault)
 
 ### Development
 
