@@ -1,7 +1,24 @@
 [package]
-name = "disk-lister"
+name = "confidential-disk-encryption"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+description = "A cross-platform Azure VM extension for confidential disk encryption"
+authors = ["Azure"]
+license = "MIT"
+repository = "https://github.com/Azure/confidential-linux-disk-encryption"
+keywords = ["azure", "encryption", "disk", "confidential-computing"]
+categories = ["command-line-utilities", "cryptography"]
 
 [dependencies]
 sysinfo = "0.37"
+thiserror = "2.0"
+
+[dev-dependencies]
+
+[lib]
+name = "confidential_disk_encryption"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cde"
+path = "src/main.rs"
