@@ -10,7 +10,8 @@
 //!
 //! The extension automatically encrypts all data disks when enabled.
 
-use confidential_disk_encryption::{handler::ExtensionHandler, logging, Result};
+use confidential_disk_encryption::{handler::ExtensionHandler, logging, ErrorCode, PrerequisiteChecker, Result};
+use confidential_disk_encryption::Error;
 use std::env;
 use std::process::ExitCode;
 use tracing::{error, info};
@@ -25,6 +26,8 @@ enum Command {
     Uninstall,
     /// For development: show disk info without encrypting
     DryRun,
+    /// Check prerequisites without performing encryption
+    CheckPrereqs,
 }
 
 impl Command {
@@ -36,6 +39,7 @@ impl Command {
             "update" => Some(Command::Update),
             "uninstall" => Some(Command::Uninstall),
             "dry-run" | "dryrun" | "--dry-run" => Some(Command::DryRun),
+            "check-prereqs" | "check-prerequisites" | "prereqs" => Some(Command::CheckPrereqs),
             _ => None,
         }
     }
@@ -54,7 +58,8 @@ fn print_usage() {
     eprintln!("  uninstall   Remove the extension (disks remain encrypted)");
     eprintln!();
     eprintln!("Commands (Development):");
-    eprintln!("  dry-run     Discover disks and show what would be encrypted");
+    eprintln!("  dry-run        Discover disks and show what would be encrypted");
+    eprintln!("  check-prereqs  Check if the VM meets all prerequisites");
 }
 
 fn run() -> Result<()> {
@@ -69,7 +74,8 @@ fn run() -> Result<()> {
             Some(cmd) => cmd,
             None => {
                 print_usage();
-                return Err(confidential_disk_encryption::Error::InvalidConfiguration(
+                return Err(Error::with_message(
+                    ErrorCode::InvalidConfiguration,
                     format!("Unknown command: {}", args[1]),
                 ));
             }
@@ -77,15 +83,41 @@ fn run() -> Result<()> {
     };
 
     // Initialize logging
-    // Use dev logging for dry-run (logs to stdout + file in ./logs)
+    // Use dev logging for dry-run and check-prereqs (logs to stdout + file in ./logs)
     // Use production logging for other commands (logs to system location)
-    let _guard = if command == Command::DryRun {
+    let _guard = if command == Command::DryRun || command == Command::CheckPrereqs {
         logging::init_dev_logging()?
     } else {
         logging::init_default_logging()?
     };
 
     info!(command = ?command, "Extension invoked");
+
+    // Handle check-prereqs specially - it doesn't need a handler
+    if command == Command::CheckPrereqs {
+        let report = PrerequisiteChecker::run_all_checks();
+        
+        // Print summary
+        println!();
+        println!("=== Prerequisite Check Summary ===");
+        println!();
+        for check in &report.checks {
+            let status = if check.passed { "✓" } else { "✗" };
+            println!("  {} {}: {}", status, check.name, check.message);
+        }
+        println!();
+        
+        if report.all_passed {
+            println!("All prerequisites met! The extension can run on this VM.");
+            return Ok(());
+        } else {
+            println!(
+                "Prerequisites check failed: {} error(s), {} warning(s)",
+                report.error_count, report.warning_count
+            );
+            return report.into_result();
+        }
+    }
 
     // Create handler (dry-run mode for DryRun command)
     let handler = if command == Command::DryRun {
@@ -101,6 +133,7 @@ fn run() -> Result<()> {
         Command::Disable => handler.handle_disable(),
         Command::Update => handler.handle_update(),
         Command::Uninstall => handler.handle_uninstall(),
+        Command::CheckPrereqs => unreachable!(), // Handled above
     }
 }
 

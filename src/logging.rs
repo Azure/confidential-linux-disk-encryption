@@ -80,9 +80,9 @@ impl Default for LogConfig {
 pub fn init_logging(config: &LogConfig) -> crate::Result<WorkerGuard> {
     // Create log directory if it doesn't exist
     fs::create_dir_all(&config.log_dir).map_err(|e| {
-        crate::Error::Io(std::io::Error::new(
-            e.kind(),
-            format!("Failed to create log directory {:?}: {}", config.log_dir, e),
+        crate::Error::from(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to create log directory: {}", e),
         ))
     })?;
 

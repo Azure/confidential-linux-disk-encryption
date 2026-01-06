@@ -10,7 +10,8 @@
 //! The extension automatically encrypts all data disks when enabled.
 
 use crate::disk::{self, DiskInfo};
-use crate::error::{Error, Result};
+use crate::error::{Error, ErrorCode, Result};
+use crate::prerequisites::PrerequisiteChecker;
 use tracing::{error, info, instrument, warn};
 
 /// Extension handler that manages the extension lifecycle.
@@ -99,10 +100,10 @@ impl ExtensionHandler {
         );
 
         if failure_count > 0 {
-            return Err(Error::DiskOperation(format!(
-                "Failed to encrypt {} disk(s)",
-                failure_count
-            )));
+            return Err(Error::with_message(
+                ErrorCode::EncryptionFailed,
+                format!("Failed to encrypt {} disk(s)", failure_count),
+            ));
         }
 
         Ok(())
@@ -141,48 +142,30 @@ impl ExtensionHandler {
     }
 
     /// Validate that prerequisites are met for the extension to run.
+    ///
+    /// This performs comprehensive checks for:
+    /// - Required encryption tools (cryptsetup on Linux, BitLocker on Windows)
+    /// - Kernel module availability (dm-crypt on Linux)
+    /// - TPM availability for auto-unlock
+    /// - Root/Admin permissions
+    ///
+    /// Returns an error with detailed messages if any required prerequisite fails.
     fn validate_prerequisites(&self) -> Result<()> {
-        // Check for cryptsetup on Linux
-        #[cfg(target_os = "linux")]
-        {
-            if !self.command_exists("cryptsetup") {
-                return Err(Error::Platform(
-                    "cryptsetup is required but not found. Install with: apt install cryptsetup".to_string(),
-                ));
+        if self.dry_run {
+            info!("Dry-run mode: Running prerequisite checks (failures won't block)");
+            let report = PrerequisiteChecker::run_all_checks();
+            
+            if !report.all_passed {
+                warn!(
+                    errors = report.error_count,
+                    warnings = report.warning_count,
+                    "Some prerequisite checks failed (ignored in dry-run mode)"
+                );
             }
-            info!("cryptsetup found");
+            return Ok(());
         }
 
-        // Check for BitLocker on Windows
-        #[cfg(target_os = "windows")]
-        {
-            if !self.command_exists("manage-bde") {
-                return Err(Error::Platform(
-                    "BitLocker (manage-bde) is required but not found".to_string(),
-                ));
-            }
-            info!("BitLocker (manage-bde) found");
-        }
-
-        Ok(())
-    }
-
-    /// Check if a command exists on the system.
-    fn command_exists(&self, command: &str) -> bool {
-        #[cfg(target_os = "windows")]
-        let check = std::process::Command::new("where")
-            .arg(command)
-            .output();
-
-        #[cfg(not(target_os = "windows"))]
-        let check = std::process::Command::new("which")
-            .arg(command)
-            .output();
-
-        match check {
-            Ok(output) => output.status.success(),
-            Err(_) => false,
-        }
+        PrerequisiteChecker::ensure_prerequisites()
     }
 
     /// Filter disks to only include data disks (exclude OS disk).

@@ -127,7 +127,7 @@ impl CommandRunner for SystemCommandRunner {
         let output = std::process::Command::new(command)
             .args(&args)
             .output()
-            .map_err(|e| crate::Error::Io(e))?;
+            .map_err(|e| crate::Error::from(e))?;
         
         Ok(CommandOutput {
             status: output.status.code().unwrap_or(-1),

@@ -66,6 +66,7 @@ name = "confidential-disk-encryption"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
+ "libc",
  "mockall",
  "predicates",
  "rstest",
