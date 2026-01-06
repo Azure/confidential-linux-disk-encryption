@@ -10,8 +10,10 @@
 //!
 //! The extension automatically encrypts all data disks when enabled.
 
-use confidential_disk_encryption::{handler::ExtensionHandler, logging, ErrorCode, PrerequisiteChecker, Result};
 use confidential_disk_encryption::Error;
+use confidential_disk_encryption::{
+    handler::ExtensionHandler, logging, ErrorCode, PrerequisiteChecker, Result,
+};
 use std::env;
 use std::process::ExitCode;
 use tracing::{error, info};
@@ -65,7 +67,7 @@ fn print_usage() {
 fn run() -> Result<()> {
     // Parse command from arguments
     let args: Vec<String> = env::args().collect();
-    
+
     let command = if args.len() < 2 {
         // Default to dry-run for development convenience
         Command::DryRun
@@ -96,7 +98,7 @@ fn run() -> Result<()> {
     // Handle check-prereqs specially - it doesn't need a handler
     if command == Command::CheckPrereqs {
         let report = PrerequisiteChecker::run_all_checks();
-        
+
         // Print summary
         println!();
         println!("=== Prerequisite Check Summary ===");
@@ -106,7 +108,7 @@ fn run() -> Result<()> {
             println!("  {} {}: {}", status, check.name, check.message);
         }
         println!();
-        
+
         if report.all_passed {
             println!("All prerequisites met! The extension can run on this VM.");
             return Ok(());

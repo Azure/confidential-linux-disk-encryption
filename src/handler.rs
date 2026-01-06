@@ -93,11 +93,7 @@ impl ExtensionHandler {
             }
         }
 
-        info!(
-            success_count,
-            failure_count,
-            "Disk encryption completed"
-        );
+        info!(success_count, failure_count, "Disk encryption completed");
 
         if failure_count > 0 {
             return Err(Error::with_message(
@@ -154,7 +150,7 @@ impl ExtensionHandler {
         if self.dry_run {
             info!("Dry-run mode: Running prerequisite checks (failures won't block)");
             let report = PrerequisiteChecker::run_all_checks();
-            
+
             if !report.all_passed {
                 warn!(
                     errors = report.error_count,
@@ -231,8 +227,8 @@ impl Default for ExtensionHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::disk::DiskType;
+    use std::path::PathBuf;
 
     fn create_test_disk(name: &str, mount_point: &str, is_removable: bool) -> DiskInfo {
         DiskInfo {
@@ -461,7 +457,7 @@ mod tests {
     fn test_dry_run_encrypt_disk_does_not_fail() {
         let handler = ExtensionHandler::new_dry_run();
         let disk = create_test_disk("sdb1", "/mnt/data", false);
-        
+
         // Dry run should always succeed
         assert!(handler.encrypt_disk(&disk).is_ok());
     }
