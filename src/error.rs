@@ -476,7 +476,7 @@ mod tests {
 
     #[test]
     fn test_error_with_source() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let io_err = std::io::Error::other("file not found");
         let err = Error::new(ErrorCode::IoError).with_source(io_err);
 
         assert!(err.source.is_some());
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_error_from_io() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let io_err = std::io::Error::other("file not found");
         let err: Error = io_err.into();
         assert_eq!(err.code, ErrorCode::IoError);
         assert!(err.source.is_some());
@@ -555,6 +555,7 @@ mod tests {
 
     #[test]
     fn test_error_from_io_various_kinds() {
+        // Test various error kinds (using deprecated API for non-Other kinds)
         let kinds = [
             std::io::ErrorKind::NotFound,
             std::io::ErrorKind::PermissionDenied,
@@ -563,6 +564,7 @@ mod tests {
         ];
 
         for kind in kinds {
+            #[allow(deprecated)]
             let io_err = std::io::Error::new(kind, "test");
             let err: Error = io_err.into();
             assert_eq!(err.code, ErrorCode::IoError);
