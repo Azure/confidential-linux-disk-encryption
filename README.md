@@ -1,5 +1,7 @@
 # Confidential Disk Encryption Extension
 
+[![CI](https://github.com/Azure/confidential-linux-disk-encryption/actions/workflows/ci.yml/badge.svg)](https://github.com/Azure/confidential-linux-disk-encryption/actions/workflows/ci.yml)
+
 A cross-platform Azure VM extension for confidential disk encryption, built in Rust.
 
 ## Overview
