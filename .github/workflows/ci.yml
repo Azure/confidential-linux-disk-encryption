@@ -30,11 +30,14 @@ jobs:
         with:
           shared-key: ${{ matrix.os }}
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo nextest run --profile ci
 
       - name: Run tests (release mode)
-        run: cargo test --release --verbose
+        run: cargo nextest run --release --profile ci
 
   build:
     name: Build (${{ matrix.os }})

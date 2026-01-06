@@ -64,6 +64,7 @@ Navigate to VM → Extensions → Add → Confidential Disk Encryption
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) 1.70+
+- [cargo-nextest](https://nexte.st/) (recommended for testing)
 - **Linux**: `cryptsetup`, `systemd` 248+
 - **Windows**: BitLocker feature
 
@@ -76,7 +77,13 @@ cargo build --release
 ### Testing
 
 ```bash
-# Run all tests
+# Install nextest (recommended - cleaner output)
+cargo install cargo-nextest --locked
+
+# Run all tests with nextest
+cargo nextest run
+
+# Or use standard cargo test
 cargo test
 
 # Dry run (shows what would be encrypted)

@@ -431,19 +431,85 @@ impl PrerequisiteChecker {
 mod tests {
     use super::*;
 
+    // =========================================================================
+    // PrerequisiteCheck tests
+    // =========================================================================
+
     #[test]
     fn test_prerequisite_check_pass() {
         let check = PrerequisiteCheck::pass("test", "Test passed");
         assert!(check.passed);
         assert_eq!(check.name, "test");
+        assert_eq!(check.message, "Test passed");
+        assert_eq!(check.severity, CheckSeverity::Info);
     }
 
     #[test]
-    fn test_prerequisite_check_fail() {
+    fn test_prerequisite_check_fail_error() {
         let check = PrerequisiteCheck::fail("test", "Test failed", CheckSeverity::Error);
         assert!(!check.passed);
+        assert_eq!(check.name, "test");
+        assert_eq!(check.message, "Test failed");
         assert_eq!(check.severity, CheckSeverity::Error);
     }
+
+    #[test]
+    fn test_prerequisite_check_fail_warning() {
+        let check = PrerequisiteCheck::fail("test", "Test warning", CheckSeverity::Warning);
+        assert!(!check.passed);
+        assert_eq!(check.severity, CheckSeverity::Warning);
+    }
+
+    #[test]
+    fn test_prerequisite_check_fail_info() {
+        let check = PrerequisiteCheck::fail("test", "Info", CheckSeverity::Info);
+        assert!(!check.passed);
+        assert_eq!(check.severity, CheckSeverity::Info);
+    }
+
+    #[test]
+    fn test_prerequisite_check_debug() {
+        let check = PrerequisiteCheck::pass("test", "OK");
+        let debug = format!("{:?}", check);
+        assert!(debug.contains("PrerequisiteCheck"));
+        assert!(debug.contains("test"));
+    }
+
+    #[test]
+    fn test_prerequisite_check_clone() {
+        let check = PrerequisiteCheck::pass("test", "OK");
+        let cloned = check.clone();
+        assert_eq!(check.name, cloned.name);
+        assert_eq!(check.passed, cloned.passed);
+    }
+
+    // =========================================================================
+    // CheckSeverity tests
+    // =========================================================================
+
+    #[test]
+    fn test_check_severity_equality() {
+        assert_eq!(CheckSeverity::Error, CheckSeverity::Error);
+        assert_ne!(CheckSeverity::Error, CheckSeverity::Warning);
+        assert_ne!(CheckSeverity::Warning, CheckSeverity::Info);
+    }
+
+    #[test]
+    fn test_check_severity_copy() {
+        let severity = CheckSeverity::Error;
+        let copy = severity; // Copy trait
+        assert_eq!(severity, copy);
+    }
+
+    #[test]
+    fn test_check_severity_debug() {
+        let debug = format!("{:?}", CheckSeverity::Error);
+        assert!(debug.contains("Error"));
+    }
+
+    // =========================================================================
+    // PrerequisiteReport tests
+    // =========================================================================
 
     #[test]
     fn test_report_all_passed() {
@@ -454,6 +520,16 @@ mod tests {
         let report = PrerequisiteReport::from_checks(checks);
         assert!(report.all_passed);
         assert_eq!(report.error_count, 0);
+        assert_eq!(report.warning_count, 0);
+    }
+
+    #[test]
+    fn test_report_empty_checks() {
+        let report = PrerequisiteReport::from_checks(vec![]);
+        assert!(report.all_passed);
+        assert_eq!(report.error_count, 0);
+        assert_eq!(report.warning_count, 0);
+        assert!(report.checks.is_empty());
     }
 
     #[test]
@@ -465,6 +541,19 @@ mod tests {
         let report = PrerequisiteReport::from_checks(checks);
         assert!(!report.all_passed);
         assert_eq!(report.error_count, 1);
+        assert_eq!(report.warning_count, 0);
+    }
+
+    #[test]
+    fn test_report_multiple_errors() {
+        let checks = vec![
+            PrerequisiteCheck::fail("check1", "Failed 1", CheckSeverity::Error),
+            PrerequisiteCheck::fail("check2", "Failed 2", CheckSeverity::Error),
+            PrerequisiteCheck::fail("check3", "Failed 3", CheckSeverity::Error),
+        ];
+        let report = PrerequisiteReport::from_checks(checks);
+        assert!(!report.all_passed);
+        assert_eq!(report.error_count, 3);
     }
 
     #[test]
@@ -479,6 +568,45 @@ mod tests {
     }
 
     #[test]
+    fn test_report_mixed_severity() {
+        let checks = vec![
+            PrerequisiteCheck::pass("check1", "OK"),
+            PrerequisiteCheck::fail("check2", "Error", CheckSeverity::Error),
+            PrerequisiteCheck::fail("check3", "Warning", CheckSeverity::Warning),
+            PrerequisiteCheck::fail("check4", "Info", CheckSeverity::Info),
+        ];
+        let report = PrerequisiteReport::from_checks(checks);
+        assert!(!report.all_passed);
+        assert_eq!(report.error_count, 1);
+        assert_eq!(report.warning_count, 1);
+        // Info failures are not counted in error or warning
+    }
+
+    #[test]
+    fn test_report_preserves_check_order() {
+        let checks = vec![
+            PrerequisiteCheck::pass("first", "1"),
+            PrerequisiteCheck::pass("second", "2"),
+            PrerequisiteCheck::pass("third", "3"),
+        ];
+        let report = PrerequisiteReport::from_checks(checks);
+        assert_eq!(report.checks[0].name, "first");
+        assert_eq!(report.checks[1].name, "second");
+        assert_eq!(report.checks[2].name, "third");
+    }
+
+    #[test]
+    fn test_report_debug() {
+        let report = PrerequisiteReport::from_checks(vec![]);
+        let debug = format!("{:?}", report);
+        assert!(debug.contains("PrerequisiteReport"));
+    }
+
+    // =========================================================================
+    // into_result tests
+    // =========================================================================
+
+    #[test]
     fn test_into_result_success() {
         let checks = vec![PrerequisiteCheck::pass("check1", "OK")];
         let report = PrerequisiteReport::from_checks(checks);
@@ -489,6 +617,71 @@ mod tests {
     fn test_into_result_failure() {
         let checks = vec![PrerequisiteCheck::fail("check1", "Failed", CheckSeverity::Error)];
         let report = PrerequisiteReport::from_checks(checks);
-        assert!(report.into_result().is_err());
+        let result = report.into_result();
+        assert!(result.is_err());
+        
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrorCode::PrerequisitesNotMet);
+        assert!(err.message.contains("check1"));
+        assert!(err.message.contains("Failed"));
+    }
+
+    #[test]
+    fn test_into_result_multiple_errors() {
+        let checks = vec![
+            PrerequisiteCheck::fail("check1", "Error 1", CheckSeverity::Error),
+            PrerequisiteCheck::fail("check2", "Error 2", CheckSeverity::Error),
+        ];
+        let report = PrerequisiteReport::from_checks(checks);
+        let result = report.into_result();
+        assert!(result.is_err());
+        
+        let err = result.unwrap_err();
+        // Both errors should be in the message
+        assert!(err.message.contains("check1"));
+        assert!(err.message.contains("check2"));
+    }
+
+    #[test]
+    fn test_into_result_warnings_succeed() {
+        let checks = vec![
+            PrerequisiteCheck::pass("check1", "OK"),
+            PrerequisiteCheck::fail("check2", "Warning", CheckSeverity::Warning),
+        ];
+        let report = PrerequisiteReport::from_checks(checks);
+        assert!(report.into_result().is_ok());
+    }
+
+    // =========================================================================
+    // PrerequisiteChecker integration tests
+    // =========================================================================
+
+    #[test]
+    fn test_run_all_checks_returns_report() {
+        // Just verify it runs without panicking
+        let report = PrerequisiteChecker::run_all_checks();
+        // Should have at least some checks
+        assert!(!report.checks.is_empty());
+    }
+
+    #[test]
+    fn test_ensure_prerequisites_returns_result() {
+        // Just verify it runs without panicking
+        let _result = PrerequisiteChecker::ensure_prerequisites();
+        // Result depends on environment, so we just verify it runs
+    }
+
+    #[test]
+    fn test_check_disk_space_runs() {
+        let check = PrerequisiteChecker::check_disk_space();
+        // On most systems, temp dir should exist
+        assert!(!check.name.is_empty());
+    }
+
+    #[test]
+    fn test_check_root_permissions_runs() {
+        let check = PrerequisiteChecker::check_root_permissions();
+        assert_eq!(check.name, "Root/Admin permissions");
+        // Result depends on whether tests run as root
     }
 }

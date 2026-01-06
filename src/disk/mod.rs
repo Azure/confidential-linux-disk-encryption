@@ -143,23 +143,70 @@ pub fn print_disk_info(disks: &[DiskInfo]) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_disk_info_calculations() {
-        let disk = DiskInfo {
+    fn create_test_disk(total: u64, available: u64) -> DiskInfo {
+        DiskInfo {
             name: "test".to_string(),
-            mount_point: PathBuf::from("/"),
+            mount_point: PathBuf::from("/mnt/test"),
             file_system: "ext4".to_string(),
             disk_type: DiskType::SSD,
-            total_space: 1_073_741_824, // 1 GB
-            available_space: 536_870_912, // 0.5 GB
+            total_space: total,
+            available_space: available,
             is_removable: false,
-        };
+        }
+    }
+
+    #[test]
+    fn test_disk_info_calculations() {
+        let disk = create_test_disk(1_073_741_824, 536_870_912); // 1 GB total, 0.5 GB available
 
         assert_eq!(disk.used_space(), 536_870_912);
         assert!((disk.usage_percent() - 50.0).abs() < 0.01);
         assert!((disk.total_space_gb() - 1.0).abs() < 0.01);
         assert!((disk.available_space_gb() - 0.5).abs() < 0.01);
         assert!((disk.used_space_gb() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_disk_info_zero_space() {
+        let disk = create_test_disk(0, 0);
+        
+        assert_eq!(disk.used_space(), 0);
+        assert_eq!(disk.usage_percent(), 0.0);
+        assert_eq!(disk.total_space_gb(), 0.0);
+    }
+
+    #[test]
+    fn test_disk_info_full_disk() {
+        let disk = create_test_disk(1_073_741_824, 0); // Full disk
+        
+        assert_eq!(disk.used_space(), 1_073_741_824);
+        assert!((disk.usage_percent() - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_disk_info_empty_disk() {
+        let disk = create_test_disk(1_073_741_824, 1_073_741_824); // Empty disk
+        
+        assert_eq!(disk.used_space(), 0);
+        assert!((disk.usage_percent() - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_disk_info_large_disk() {
+        // 1 TB disk
+        let disk = create_test_disk(1_099_511_627_776, 549_755_813_888);
+        
+        assert!((disk.total_space_gb() - 1024.0).abs() < 0.01);
+        assert!((disk.available_space_gb() - 512.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_disk_info_saturating_sub() {
+        // Edge case: available > total (shouldn't happen, but test saturating behavior)
+        let mut disk = create_test_disk(100, 200);
+        disk.available_space = 200; // Manually set to test saturating_sub
+        
+        assert_eq!(disk.used_space(), 0); // Should not underflow
     }
 
     #[test]
@@ -170,11 +217,56 @@ mod tests {
     }
 
     #[test]
+    fn test_disk_type_equality() {
+        assert_eq!(DiskType::SSD, DiskType::SSD);
+        assert_ne!(DiskType::SSD, DiskType::HDD);
+        assert_ne!(DiskType::HDD, DiskType::Unknown);
+    }
+
+    #[test]
+    fn test_disk_type_copy() {
+        let disk_type = DiskType::SSD;
+        let copy = disk_type; // Copy
+        assert_eq!(disk_type, copy);
+    }
+
+    #[test]
+    fn test_disk_info_clone() {
+        let disk = create_test_disk(1024, 512);
+        let cloned = disk.clone();
+        
+        assert_eq!(disk.name, cloned.name);
+        assert_eq!(disk.total_space, cloned.total_space);
+    }
+
+    #[test]
+    fn test_disk_info_debug() {
+        let disk = create_test_disk(1024, 512);
+        let debug = format!("{:?}", disk);
+        
+        assert!(debug.contains("DiskInfo"));
+        assert!(debug.contains("test"));
+    }
+
+    #[test]
     fn test_discover_disks_runs() {
         // This test just verifies that discover_disks() runs without panicking
         let disks = discover_disks();
         // On most systems, there should be at least one disk
         // but we don't assert this as it depends on the environment
         let _ = disks;
+    }
+
+    #[test]
+    fn test_print_disk_info_empty() {
+        // Just verify it doesn't panic with empty list
+        print_disk_info(&[]);
+    }
+
+    #[test]
+    fn test_print_disk_info_single() {
+        // Just verify it doesn't panic
+        let disk = create_test_disk(1_073_741_824, 536_870_912);
+        print_disk_info(&[disk]);
     }
 }

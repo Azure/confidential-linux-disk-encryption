@@ -246,6 +246,39 @@ mod tests {
         }
     }
 
+    // =========================================================================
+    // Constructor tests
+    // =========================================================================
+
+    #[test]
+    fn test_new_creates_non_dry_run_handler() {
+        let handler = ExtensionHandler::new();
+        assert!(!handler.dry_run);
+    }
+
+    #[test]
+    fn test_new_dry_run_creates_dry_run_handler() {
+        let handler = ExtensionHandler::new_dry_run();
+        assert!(handler.dry_run);
+    }
+
+    #[test]
+    fn test_default_creates_non_dry_run_handler() {
+        let handler = ExtensionHandler::default();
+        assert!(!handler.dry_run);
+    }
+
+    #[test]
+    fn test_handler_debug() {
+        let handler = ExtensionHandler::new();
+        let debug = format!("{:?}", handler);
+        assert!(debug.contains("ExtensionHandler"));
+    }
+
+    // =========================================================================
+    // is_data_disk tests
+    // =========================================================================
+
     #[test]
     fn test_is_data_disk_excludes_root() {
         let handler = ExtensionHandler::new();
@@ -257,6 +290,13 @@ mod tests {
     fn test_is_data_disk_excludes_boot() {
         let handler = ExtensionHandler::new();
         let disk = create_test_disk("sda2", "/boot", false);
+        assert!(!handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_excludes_boot_efi() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sda3", "/boot/efi", false);
         assert!(!handler.is_data_disk(&disk));
     }
 
@@ -273,6 +313,52 @@ mod tests {
         let disk = create_test_disk("sdc1", "/mnt/data", false);
         assert!(handler.is_data_disk(&disk));
     }
+
+    #[test]
+    fn test_is_data_disk_includes_var() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sdc1", "/var", false);
+        assert!(handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_includes_home() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sdc1", "/home", false);
+        assert!(handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_excludes_windows_c_drive() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("C:", "C:\\", false);
+        assert!(!handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_excludes_windows_c_lowercase() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("c:", "c:\\", false);
+        assert!(!handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_includes_windows_d_drive() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("D:", "D:\\", false);
+        assert!(handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_includes_windows_data_path() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("E:", "E:\\Data", false);
+        assert!(handler.is_data_disk(&disk));
+    }
+
+    // =========================================================================
+    // filter_data_disks tests
+    // =========================================================================
 
     #[test]
     fn test_filter_data_disks() {
@@ -292,8 +378,98 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_data_disks_empty_input() {
+        let handler = ExtensionHandler::new();
+        let disks: Vec<DiskInfo> = vec![];
+
+        let data_disks = handler.filter_data_disks(&disks);
+        assert!(data_disks.is_empty());
+    }
+
+    #[test]
+    fn test_filter_data_disks_all_os_disks() {
+        let handler = ExtensionHandler::new();
+        let disks = vec![
+            create_test_disk("sda1", "/", false),
+            create_test_disk("sda2", "/boot", false),
+        ];
+
+        let data_disks = handler.filter_data_disks(&disks);
+        assert!(data_disks.is_empty());
+    }
+
+    #[test]
+    fn test_filter_data_disks_all_data_disks() {
+        let handler = ExtensionHandler::new();
+        let disks = vec![
+            create_test_disk("sdb1", "/mnt/data1", false),
+            create_test_disk("sdc1", "/mnt/data2", false),
+        ];
+
+        let data_disks = handler.filter_data_disks(&disks);
+        assert_eq!(data_disks.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_data_disks_preserves_order() {
+        let handler = ExtensionHandler::new();
+        let disks = vec![
+            create_test_disk("sdc1", "/mnt/c", false),
+            create_test_disk("sda1", "/mnt/a", false),
+            create_test_disk("sdb1", "/mnt/b", false),
+        ];
+
+        let data_disks = handler.filter_data_disks(&disks);
+        assert_eq!(data_disks[0].name, "sdc1");
+        assert_eq!(data_disks[1].name, "sda1");
+        assert_eq!(data_disks[2].name, "sdb1");
+    }
+
+    // =========================================================================
+    // Lifecycle handler tests (basic coverage)
+    // =========================================================================
+
+    #[test]
+    fn test_handle_disable_succeeds() {
+        let handler = ExtensionHandler::new();
+        assert!(handler.handle_disable().is_ok());
+    }
+
+    #[test]
+    fn test_handle_update_succeeds() {
+        let handler = ExtensionHandler::new();
+        assert!(handler.handle_update().is_ok());
+    }
+
+    #[test]
+    fn test_handle_uninstall_succeeds() {
+        let handler = ExtensionHandler::new();
+        assert!(handler.handle_uninstall().is_ok());
+    }
+
+    // =========================================================================
+    // Dry run tests
+    // =========================================================================
+
+    #[test]
     fn test_dry_run_mode() {
         let handler = ExtensionHandler::new_dry_run();
         assert!(handler.dry_run);
+    }
+
+    #[test]
+    fn test_dry_run_encrypt_disk_does_not_fail() {
+        let handler = ExtensionHandler::new_dry_run();
+        let disk = create_test_disk("sdb1", "/mnt/data", false);
+        
+        // Dry run should always succeed
+        assert!(handler.encrypt_disk(&disk).is_ok());
+    }
+
+    #[test]
+    fn test_dry_run_handle_enable_succeeds() {
+        let handler = ExtensionHandler::new_dry_run();
+        // This may log but should not fail
+        assert!(handler.handle_enable().is_ok());
     }
 }

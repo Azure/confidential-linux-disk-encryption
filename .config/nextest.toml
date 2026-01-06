@@ -1,0 +1,19 @@
+# cargo-nextest configuration
+# https://nexte.st/book/configuration
+
+[profile.default]
+# Show one line per test by default
+status-level = "pass"
+# Show output for failed tests
+failure-output = "immediate"
+# Don't show output for passing tests  
+success-output = "never"
+
+[profile.ci]
+# CI profile with compact output
+status-level = "pass"
+failure-output = "immediate-final"
+# Fail fast in CI
+fail-fast = false
+# Retry flaky tests once
+retries = 1

@@ -1,75 +1,159 @@
 # Testing
 
-## Run Tests
+## Test Runner
+
+We use [cargo-nextest](https://nexte.st/) for better test output and faster parallel execution.
+
+### Install nextest
 
 ```bash
-cargo test              # All tests
-cargo test --lib        # Unit tests only
-cargo test test_name    # Single test
-cargo test -- --nocapture  # Show output
+cargo install cargo-nextest --locked
 ```
 
-## Test Structure
+### Run Tests
+
+```bash
+# Run all tests (recommended)
+cargo nextest run
+
+# Run with verbose output
+cargo nextest run --no-capture
+
+# Run specific test
+cargo nextest run test_disk_info_calculations
+
+# Run tests matching pattern
+cargo nextest run disk
+
+# Run in release mode
+cargo nextest run --release
+```
+
+### Standard cargo test
+
+If you prefer the standard test runner:
+
+```bash
+cargo test
+
+# Quiet mode (just summary)
+cargo test -q
+```
+
+## Test Organization
+
+Tests are colocated with source code (Rust best practice):
 
 ```
 src/
-├── *.rs              # Unit tests in #[cfg(test)] mod tests
+├── disk/mod.rs       # 16 unit tests
+├── error.rs          # 25 unit tests  
+├── handler.rs        # 22 unit tests
+├── prerequisites.rs  # 27 unit tests
+├── traits.rs         # 8 unit tests
+├── logging.rs        # 2 unit tests
 tests/
-└── cli_integration.rs  # CLI integration tests
+└── cli_integration.rs  # 8 integration tests
 ```
 
-## Mocking
+**Total: 112 tests**
 
-Traits enable mocking external dependencies:
+## Test Categories
 
-| Trait | Purpose |
-|-------|---------|
-| `DiskDiscovery` | Disk enumeration |
-| `EncryptionProvider` | Encryption operations |
-| `TpmProvider` | TPM operations |
-| `CommandRunner` | Shell commands |
+### Unit Tests (colocated)
+
+Test individual functions and internal logic:
 
 ```rust
-use confidential_disk_encryption::traits::MockDiskDiscovery;
-
-#[test]
-fn test_with_mocks() {
-    let mut mock = MockDiskDiscovery::new();
-    mock.expect_discover_disks().returning(|| vec![/* test data */]);
+// src/disk/mod.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
     
-    let disks = mock.discover_disks();
-    assert_eq!(disks.len(), 1);
+    #[test]
+    fn test_disk_info_calculations() {
+        let disk = DiskInfo { ... };
+        assert_eq!(disk.used_space(), 536_870_912);
+    }
 }
 ```
 
-## CLI Testing
+### Integration Tests (`tests/`)
+
+Test public API from external perspective:
 
 ```rust
+// tests/cli_integration.rs
 use assert_cmd::Command;
-use predicates::prelude::*;
 
 #[test]
-fn test_cli_success() {
-    Command::cargo_bin("cde").unwrap()
+fn test_dry_run_succeeds() {
+    Command::cargo_bin("cde")
         .arg("dry-run")
         .assert()
         .success();
 }
+```
 
+## Writing Tests
+
+### Naming Convention
+
+```rust
 #[test]
-fn test_cli_failure() {
-    Command::cargo_bin("cde").unwrap()
-        .arg("invalid")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("Unknown command"));
+fn test_<function>_<scenario>() { }
+
+// Examples:
+fn test_disk_info_zero_space() { }
+fn test_is_data_disk_excludes_root() { }
+fn test_error_from_io_various_kinds() { }
+```
+
+### Test Helpers
+
+Create helpers for repeated setup:
+
+```rust
+fn create_test_disk(name: &str, mount_point: &str) -> DiskInfo {
+    DiskInfo {
+        name: name.to_string(),
+        mount_point: PathBuf::from(mount_point),
+        // ...
+    }
 }
 ```
 
-## CI
+### Testing Errors
 
-Tests run on every PR via GitHub Actions:
-- Ubuntu and Windows
-- `cargo test --all-features`
-- `cargo clippy`
-- `cargo fmt --check`
+```rust
+#[test]
+fn test_operation_fails_with_error_code() {
+    let result = some_operation();
+    assert!(result.is_err());
+    
+    let err = result.unwrap_err();
+    assert_eq!(err.code, ErrorCode::NoDisksFound);
+}
+```
+
+## CI Testing
+
+CI uses nextest with the `ci` profile:
+
+```yaml
+- name: Run tests
+  run: cargo nextest run --profile ci
+```
+
+The CI profile (`.config/nextest.toml`):
+- Retries flaky tests once
+- Shows failures immediately
+- Runs all tests (no fail-fast)
+
+## Coverage
+
+To generate coverage reports:
+
+```bash
+cargo install cargo-llvm-cov
+cargo llvm-cov nextest

@@ -346,12 +346,107 @@ impl Error {
 mod tests {
     use super::*;
 
+    // =========================================================================
+    // ErrorCode tests
+    // =========================================================================
+
     #[test]
     fn test_error_code_string() {
         assert_eq!(ErrorCode::NoDisksFound.code(), "CDE100");
         assert_eq!(ErrorCode::PrerequisitesNotMet.code(), "CDE002");
         assert_eq!(ErrorCode::IoError.code(), "CDE500");
     }
+
+    #[test]
+    fn test_error_code_all_categories() {
+        // General
+        assert!(ErrorCode::InitializationFailed.code().starts_with("CDE0"));
+        assert!(ErrorCode::PrerequisitesNotMet.code().starts_with("CDE0"));
+        assert!(ErrorCode::InvalidOperation.code().starts_with("CDE0"));
+        
+        // Disk
+        assert!(ErrorCode::NoDisksFound.code().starts_with("CDE1"));
+        assert!(ErrorCode::DiskBusy.code().starts_with("CDE1"));
+        
+        // Encryption
+        assert!(ErrorCode::EncryptionFailed.code().starts_with("CDE2"));
+        assert!(ErrorCode::CryptsetupNotFound.code().starts_with("CDE2"));
+        
+        // Key management
+        assert!(ErrorCode::TpmNotAvailable.code().starts_with("CDE3"));
+        assert!(ErrorCode::KeyGenerationFailed.code().starts_with("CDE3"));
+        
+        // Configuration
+        assert!(ErrorCode::InvalidConfiguration.code().starts_with("CDE4"));
+        
+        // Platform
+        assert!(ErrorCode::IoError.code().starts_with("CDE5"));
+        assert!(ErrorCode::PermissionDenied.code().starts_with("CDE5"));
+    }
+
+    #[test]
+    fn test_error_code_display() {
+        let code = ErrorCode::NoDisksFound;
+        assert_eq!(format!("{}", code), "CDE100");
+    }
+
+    #[test]
+    fn test_error_code_default_messages_not_empty() {
+        let codes = [
+            ErrorCode::InitializationFailed,
+            ErrorCode::NoDisksFound,
+            ErrorCode::EncryptionFailed,
+            ErrorCode::TpmNotAvailable,
+            ErrorCode::InvalidConfiguration,
+            ErrorCode::IoError,
+        ];
+        
+        for code in codes {
+            assert!(!code.default_message().is_empty(), "Code {:?} has empty message", code);
+        }
+    }
+
+    #[test]
+    fn test_error_code_hints() {
+        // Codes with hints
+        assert!(ErrorCode::PrerequisitesNotMet.hint().is_some());
+        assert!(ErrorCode::NoDisksFound.hint().is_some());
+        assert!(ErrorCode::CryptsetupNotFound.hint().is_some());
+        assert!(ErrorCode::PermissionDenied.hint().is_some());
+        assert!(ErrorCode::TpmNotAvailable.hint().is_some());
+        
+        // Codes without hints
+        assert!(ErrorCode::InitializationFailed.hint().is_none());
+        assert!(ErrorCode::IoError.hint().is_none());
+    }
+
+    #[test]
+    fn test_error_code_equality() {
+        assert_eq!(ErrorCode::NoDisksFound, ErrorCode::NoDisksFound);
+        assert_ne!(ErrorCode::NoDisksFound, ErrorCode::DiskBusy);
+    }
+
+    #[test]
+    fn test_error_code_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(ErrorCode::NoDisksFound);
+        set.insert(ErrorCode::DiskBusy);
+        set.insert(ErrorCode::NoDisksFound); // Duplicate
+        
+        assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn test_error_code_copy() {
+        let code = ErrorCode::NoDisksFound;
+        let copy = code; // Copy
+        assert_eq!(code, copy);
+    }
+
+    // =========================================================================
+    // Error tests
+    // =========================================================================
 
     #[test]
     fn test_error_default_message() {
@@ -376,11 +471,45 @@ mod tests {
     }
 
     #[test]
+    fn test_error_with_source() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let err = Error::new(ErrorCode::IoError).with_source(io_err);
+        
+        assert!(err.source.is_some());
+    }
+
+    #[test]
+    fn test_error_builder_chain() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let err = Error::with_message(ErrorCode::EncryptionFailed, "Custom message")
+            .with_details("Additional details")
+            .with_source(io_err);
+        
+        assert_eq!(err.message, "Custom message");
+        assert!(err.details.is_some());
+        assert!(err.source.is_some());
+    }
+
+    #[test]
     fn test_error_display() {
         let err = Error::new(ErrorCode::NoDisksFound);
         let display = format!("{}", err);
         assert!(display.contains("CDE100"));
         assert!(display.contains("No data disks"));
+    }
+
+    #[test]
+    fn test_error_debug() {
+        let err = Error::new(ErrorCode::NoDisksFound);
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("Error"));
+        assert!(debug.contains("NoDisksFound"));
+    }
+
+    #[test]
+    fn test_error_code_str() {
+        let err = Error::new(ErrorCode::NoDisksFound);
+        assert_eq!(err.code_str(), "CDE100");
     }
 
     #[test]
@@ -393,10 +522,86 @@ mod tests {
     }
 
     #[test]
+    fn test_error_user_message_with_details() {
+        let err = Error::new(ErrorCode::IoError)
+            .with_details("Could not open file");
+        let msg = err.user_message();
+        
+        assert!(msg.contains("CDE500"));
+        assert!(msg.contains("Details:"));
+        assert!(msg.contains("Could not open file"));
+    }
+
+    #[test]
+    fn test_error_user_message_without_hint() {
+        let err = Error::new(ErrorCode::IoError);
+        let msg = err.user_message();
+        
+        assert!(msg.contains("CDE500"));
+        assert!(!msg.contains("Hint:"));
+    }
+
+    #[test]
     fn test_error_from_io() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let err: Error = io_err.into();
         assert_eq!(err.code, ErrorCode::IoError);
         assert!(err.source.is_some());
+        assert!(err.message.contains("file not found"));
+    }
+
+    #[test]
+    fn test_error_from_io_various_kinds() {
+        let kinds = [
+            std::io::ErrorKind::NotFound,
+            std::io::ErrorKind::PermissionDenied,
+            std::io::ErrorKind::ConnectionRefused,
+            std::io::ErrorKind::TimedOut,
+        ];
+        
+        for kind in kinds {
+            let io_err = std::io::Error::new(kind, "test");
+            let err: Error = io_err.into();
+            assert_eq!(err.code, ErrorCode::IoError);
+        }
+    }
+
+    // =========================================================================
+    // Legacy compatibility tests
+    // =========================================================================
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_legacy_no_disks_found() {
+        let err = Error::no_disks_found();
+        assert_eq!(err.code, ErrorCode::NoDisksFound);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_legacy_disk_operation() {
+        let err = Error::disk_operation("Test error");
+        assert_eq!(err.code, ErrorCode::EncryptionFailed);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_legacy_platform() {
+        let err = Error::platform("Not supported");
+        assert_eq!(err.code, ErrorCode::PlatformNotSupported);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_legacy_invalid_configuration() {
+        let err = Error::invalid_configuration("Bad config");
+        assert_eq!(err.code, ErrorCode::InvalidConfiguration);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_legacy_prerequisites() {
+        let err = Error::prerequisites("Missing tools");
+        assert_eq!(err.code, ErrorCode::PrerequisitesNotMet);
     }
 }
