@@ -8,7 +8,7 @@ use predicates::prelude::*;
 
 /// Get a Command for our binary.
 fn cde() -> Command {
-    Command::cargo_bin("cde").unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("cde"))
 }
 
 #[test]
@@ -72,23 +72,17 @@ fn test_dry_run_logs_data_disk_identification() {
 fn test_multiple_dry_run_variants_work() {
     // Test various ways to specify dry-run
     for arg in &["dry-run", "dryrun", "--dry-run"] {
-        cde()
-            .arg(arg)
-            .assert()
-            .success();
+        cde().arg(arg).assert().success();
     }
 }
 
 #[test]
 fn test_dry_run_creates_log_directory() {
     use std::path::Path;
-    
+
     // Run dry-run which creates ./logs directory
-    cde()
-        .arg("dry-run")
-        .assert()
-        .success();
-    
+    cde().arg("dry-run").assert().success();
+
     // Verify logs directory was created
     assert!(Path::new("logs").exists());
 }

@@ -80,10 +80,10 @@ impl Default for LogConfig {
 pub fn init_logging(config: &LogConfig) -> crate::Result<WorkerGuard> {
     // Create log directory if it doesn't exist
     fs::create_dir_all(&config.log_dir).map_err(|e| {
-        crate::Error::from(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to create log directory: {}", e),
-        ))
+        crate::Error::from(std::io::Error::other(format!(
+            "Failed to create log directory: {}",
+            e
+        )))
     })?;
 
     // Set up file appender
@@ -91,8 +91,8 @@ pub fn init_logging(config: &LogConfig) -> crate::Result<WorkerGuard> {
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // Build the subscriber
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
     let file_layer = fmt::layer()
         .with_writer(non_blocking)
@@ -168,7 +168,7 @@ mod tests {
     fn test_init_logging_creates_directory() {
         let temp_dir = tempdir().unwrap();
         let log_dir = temp_dir.path().join("test_logs");
-        
+
         let _config = LogConfig {
             log_dir: log_dir.clone(),
             log_file: "test.log".to_string(),

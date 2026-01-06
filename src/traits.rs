@@ -14,7 +14,7 @@ use crate::error::Result;
 pub trait DiskDiscovery: Send + Sync {
     /// Discover all disks on the system.
     fn discover_disks(&self) -> Vec<DiskInfo>;
-    
+
     /// Check if a disk is a data disk (not OS disk).
     fn is_data_disk(&self, disk: &DiskInfo) -> bool;
 }
@@ -27,10 +27,10 @@ pub trait DiskDiscovery: Send + Sync {
 pub trait EncryptionProvider: Send + Sync {
     /// Check if a disk is already encrypted.
     fn is_encrypted(&self, disk: &DiskInfo) -> Result<bool>;
-    
+
     /// Encrypt a disk with the given key.
     fn encrypt(&self, disk: &DiskInfo, key: &[u8]) -> Result<()>;
-    
+
     /// Set up automatic unlock for a disk.
     fn setup_auto_unlock(&self, disk: &DiskInfo) -> Result<()>;
 }
@@ -42,7 +42,7 @@ pub trait EncryptionProvider: Send + Sync {
 pub trait TpmProvider: Send + Sync {
     /// Check if a TPM is available on the system.
     fn is_available(&self) -> bool;
-    
+
     /// Enroll a disk with TPM-based auto-unlock.
     fn enroll_disk(&self, device_path: &str) -> Result<()>;
 }
@@ -54,7 +54,7 @@ pub trait TpmProvider: Send + Sync {
 pub trait CommandRunner: Send + Sync {
     /// Check if a command exists on the system.
     fn command_exists(&self, command: &str) -> bool;
-    
+
     /// Run a command and return its output.
     /// Args are passed as a single comma-separated string for mockall compatibility.
     fn run_command(&self, command: &str, args: Vec<String>) -> Result<CommandOutput>;
@@ -85,10 +85,10 @@ impl DiskDiscovery for SystemDiskDiscovery {
     fn discover_disks(&self) -> Vec<DiskInfo> {
         crate::disk::discover_disks()
     }
-    
+
     fn is_data_disk(&self, disk: &DiskInfo) -> bool {
         let mount_point = disk.mount_point.to_string_lossy();
-        
+
         // Exclude OS disk mount points
         if mount_point == "/" || mount_point.starts_with("/boot") {
             return false;
@@ -96,7 +96,7 @@ impl DiskDiscovery for SystemDiskDiscovery {
         if mount_point.to_uppercase().starts_with("C:") {
             return false;
         }
-        
+
         // Exclude removable disks
         !disk.is_removable
     }
@@ -108,27 +108,23 @@ pub struct SystemCommandRunner;
 impl CommandRunner for SystemCommandRunner {
     fn command_exists(&self, command: &str) -> bool {
         #[cfg(target_os = "windows")]
-        let check = std::process::Command::new("where")
-            .arg(command)
-            .output();
+        let check = std::process::Command::new("where").arg(command).output();
 
         #[cfg(not(target_os = "windows"))]
-        let check = std::process::Command::new("which")
-            .arg(command)
-            .output();
+        let check = std::process::Command::new("which").arg(command).output();
 
         match check {
             Ok(output) => output.status.success(),
             Err(_) => false,
         }
     }
-    
+
     fn run_command(&self, command: &str, args: Vec<String>) -> Result<CommandOutput> {
         let output = std::process::Command::new(command)
             .args(&args)
             .output()
-            .map_err(|e| crate::Error::from(e))?;
-        
+            .map_err(crate::Error::from)?;
+
         Ok(CommandOutput {
             status: output.status.code().unwrap_or(-1),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),

@@ -207,7 +207,9 @@ impl ErrorCode {
     pub fn hint(&self) -> Option<&'static str> {
         match self {
             ErrorCode::PrerequisitesNotMet => Some("Run 'check-prereqs' command for details"),
-            ErrorCode::NoDisksFound => Some("Attach data disks to the VM before enabling encryption"),
+            ErrorCode::NoDisksFound => {
+                Some("Attach data disks to the VM before enabling encryption")
+            }
             ErrorCode::CryptsetupNotFound => Some("Install cryptsetup: apt install cryptsetup"),
             ErrorCode::PermissionDenied => Some("Run the extension as root/Administrator"),
             ErrorCode::TpmNotAvailable => Some("Ensure VM is Trusted Launch or Confidential VM"),
@@ -297,8 +299,7 @@ impl Error {
 // Convenient conversion from std::io::Error
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        Error::with_message(ErrorCode::IoError, err.to_string())
-            .with_source(err)
+        Error::with_message(ErrorCode::IoError, err.to_string()).with_source(err)
     }
 }
 
@@ -363,22 +364,22 @@ mod tests {
         assert!(ErrorCode::InitializationFailed.code().starts_with("CDE0"));
         assert!(ErrorCode::PrerequisitesNotMet.code().starts_with("CDE0"));
         assert!(ErrorCode::InvalidOperation.code().starts_with("CDE0"));
-        
+
         // Disk
         assert!(ErrorCode::NoDisksFound.code().starts_with("CDE1"));
         assert!(ErrorCode::DiskBusy.code().starts_with("CDE1"));
-        
+
         // Encryption
         assert!(ErrorCode::EncryptionFailed.code().starts_with("CDE2"));
         assert!(ErrorCode::CryptsetupNotFound.code().starts_with("CDE2"));
-        
+
         // Key management
         assert!(ErrorCode::TpmNotAvailable.code().starts_with("CDE3"));
         assert!(ErrorCode::KeyGenerationFailed.code().starts_with("CDE3"));
-        
+
         // Configuration
         assert!(ErrorCode::InvalidConfiguration.code().starts_with("CDE4"));
-        
+
         // Platform
         assert!(ErrorCode::IoError.code().starts_with("CDE5"));
         assert!(ErrorCode::PermissionDenied.code().starts_with("CDE5"));
@@ -400,9 +401,13 @@ mod tests {
             ErrorCode::InvalidConfiguration,
             ErrorCode::IoError,
         ];
-        
+
         for code in codes {
-            assert!(!code.default_message().is_empty(), "Code {:?} has empty message", code);
+            assert!(
+                !code.default_message().is_empty(),
+                "Code {:?} has empty message",
+                code
+            );
         }
     }
 
@@ -414,7 +419,7 @@ mod tests {
         assert!(ErrorCode::CryptsetupNotFound.hint().is_some());
         assert!(ErrorCode::PermissionDenied.hint().is_some());
         assert!(ErrorCode::TpmNotAvailable.hint().is_some());
-        
+
         // Codes without hints
         assert!(ErrorCode::InitializationFailed.hint().is_none());
         assert!(ErrorCode::IoError.hint().is_none());
@@ -433,7 +438,7 @@ mod tests {
         set.insert(ErrorCode::NoDisksFound);
         set.insert(ErrorCode::DiskBusy);
         set.insert(ErrorCode::NoDisksFound); // Duplicate
-        
+
         assert_eq!(set.len(), 2);
     }
 
@@ -464,27 +469,26 @@ mod tests {
 
     #[test]
     fn test_error_with_details() {
-        let err = Error::new(ErrorCode::EncryptionFailed)
-            .with_details("Failed at step 3 of 5");
+        let err = Error::new(ErrorCode::EncryptionFailed).with_details("Failed at step 3 of 5");
         assert!(err.details.is_some());
         assert_eq!(err.details.unwrap(), "Failed at step 3 of 5");
     }
 
     #[test]
     fn test_error_with_source() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let io_err = std::io::Error::other("file not found");
         let err = Error::new(ErrorCode::IoError).with_source(io_err);
-        
+
         assert!(err.source.is_some());
     }
 
     #[test]
     fn test_error_builder_chain() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let io_err = std::io::Error::other("test");
         let err = Error::with_message(ErrorCode::EncryptionFailed, "Custom message")
             .with_details("Additional details")
             .with_source(io_err);
-        
+
         assert_eq!(err.message, "Custom message");
         assert!(err.details.is_some());
         assert!(err.source.is_some());
@@ -523,10 +527,9 @@ mod tests {
 
     #[test]
     fn test_error_user_message_with_details() {
-        let err = Error::new(ErrorCode::IoError)
-            .with_details("Could not open file");
+        let err = Error::new(ErrorCode::IoError).with_details("Could not open file");
         let msg = err.user_message();
-        
+
         assert!(msg.contains("CDE500"));
         assert!(msg.contains("Details:"));
         assert!(msg.contains("Could not open file"));
@@ -536,14 +539,14 @@ mod tests {
     fn test_error_user_message_without_hint() {
         let err = Error::new(ErrorCode::IoError);
         let msg = err.user_message();
-        
+
         assert!(msg.contains("CDE500"));
         assert!(!msg.contains("Hint:"));
     }
 
     #[test]
     fn test_error_from_io() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let io_err = std::io::Error::other("file not found");
         let err: Error = io_err.into();
         assert_eq!(err.code, ErrorCode::IoError);
         assert!(err.source.is_some());
@@ -552,14 +555,16 @@ mod tests {
 
     #[test]
     fn test_error_from_io_various_kinds() {
+        // Test various error kinds (using deprecated API for non-Other kinds)
         let kinds = [
             std::io::ErrorKind::NotFound,
             std::io::ErrorKind::PermissionDenied,
             std::io::ErrorKind::ConnectionRefused,
             std::io::ErrorKind::TimedOut,
         ];
-        
+
         for kind in kinds {
+            #[allow(deprecated)]
             let io_err = std::io::Error::new(kind, "test");
             let err: Error = io_err.into();
             assert_eq!(err.code, ErrorCode::IoError);

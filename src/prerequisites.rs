@@ -101,7 +101,10 @@ impl PrerequisiteReport {
                 .map(|c| format!("{}: {}", c.name, c.message))
                 .collect();
 
-            Err(Error::with_message(ErrorCode::PrerequisitesNotMet, errors.join("; ")))
+            Err(Error::with_message(
+                ErrorCode::PrerequisitesNotMet,
+                errors.join("; "),
+            ))
         }
     }
 }
@@ -297,13 +300,14 @@ impl PrerequisiteChecker {
                 .args(["--tpm2-device=list"])
                 .output()
             {
-                Ok(output) if output.status.success() => {
-                    PrerequisiteCheck::pass(name, "vTPM available and accessible by systemd-cryptenroll")
-                }
+                Ok(output) if output.status.success() => PrerequisiteCheck::pass(
+                    name,
+                    "vTPM available and accessible by systemd-cryptenroll",
+                ),
                 _ => PrerequisiteCheck::pass(
                     name,
                     "vTPM device exists but systemd-cryptenroll may not be available",
-                )
+                ),
             }
         } else {
             PrerequisiteCheck::fail(
@@ -341,7 +345,10 @@ impl PrerequisiteChecker {
         let name = "TPM";
 
         match Command::new("powershell")
-            .args(["-Command", "Get-Tpm | Select-Object -ExpandProperty TpmPresent"])
+            .args([
+                "-Command",
+                "Get-Tpm | Select-Object -ExpandProperty TpmPresent",
+            ])
             .output()
         {
             Ok(output) => {
@@ -356,11 +363,9 @@ impl PrerequisiteChecker {
                     )
                 }
             }
-            Err(_) => PrerequisiteCheck::fail(
-                name,
-                "Could not check TPM status",
-                CheckSeverity::Warning,
-            ),
+            Err(_) => {
+                PrerequisiteCheck::fail(name, "Could not check TPM status", CheckSeverity::Warning)
+            }
         }
     }
 
@@ -615,11 +620,15 @@ mod tests {
 
     #[test]
     fn test_into_result_failure() {
-        let checks = vec![PrerequisiteCheck::fail("check1", "Failed", CheckSeverity::Error)];
+        let checks = vec![PrerequisiteCheck::fail(
+            "check1",
+            "Failed",
+            CheckSeverity::Error,
+        )];
         let report = PrerequisiteReport::from_checks(checks);
         let result = report.into_result();
         assert!(result.is_err());
-        
+
         let err = result.unwrap_err();
         assert_eq!(err.code, ErrorCode::PrerequisitesNotMet);
         assert!(err.message.contains("check1"));
@@ -635,7 +644,7 @@ mod tests {
         let report = PrerequisiteReport::from_checks(checks);
         let result = report.into_result();
         assert!(result.is_err());
-        
+
         let err = result.unwrap_err();
         // Both errors should be in the message
         assert!(err.message.contains("check1"));

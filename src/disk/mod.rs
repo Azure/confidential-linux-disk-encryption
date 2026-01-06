@@ -3,8 +3,8 @@
 //! This module provides functionality for discovering and querying disk information
 //! on both Linux and Windows platforms.
 
-use sysinfo::Disks;
 use std::path::PathBuf;
+use sysinfo::Disks;
 
 /// Information about a single disk.
 #[derive(Debug, Clone)]
@@ -95,24 +95,28 @@ impl std::fmt::Display for DiskType {
 /// ```
 pub fn discover_disks() -> Vec<DiskInfo> {
     let disks = Disks::new_with_refreshed_list();
-    
-    disks.list().iter().map(|disk| {
-        let disk_type = match disk.kind() {
-            sysinfo::DiskKind::SSD => DiskType::SSD,
-            sysinfo::DiskKind::HDD => DiskType::HDD,
-            _ => DiskType::Unknown,
-        };
 
-        DiskInfo {
-            name: disk.name().to_string_lossy().to_string(),
-            mount_point: disk.mount_point().to_path_buf(),
-            file_system: disk.file_system().to_string_lossy().to_string(),
-            disk_type,
-            total_space: disk.total_space(),
-            available_space: disk.available_space(),
-            is_removable: disk.is_removable(),
-        }
-    }).collect()
+    disks
+        .list()
+        .iter()
+        .map(|disk| {
+            let disk_type = match disk.kind() {
+                sysinfo::DiskKind::SSD => DiskType::SSD,
+                sysinfo::DiskKind::HDD => DiskType::HDD,
+                _ => DiskType::Unknown,
+            };
+
+            DiskInfo {
+                name: disk.name().to_string_lossy().to_string(),
+                mount_point: disk.mount_point().to_path_buf(),
+                file_system: disk.file_system().to_string_lossy().to_string(),
+                disk_type,
+                total_space: disk.total_space(),
+                available_space: disk.available_space(),
+                is_removable: disk.is_removable(),
+            }
+        })
+        .collect()
 }
 
 /// Prints disk information to stdout in a formatted manner.
@@ -133,7 +137,11 @@ pub fn print_disk_info(disks: &[DiskInfo]) {
         println!("  Type:           {}", disk.disk_type);
         println!("  Total Space:    {:.2} GB", disk.total_space_gb());
         println!("  Available:      {:.2} GB", disk.available_space_gb());
-        println!("  Used:           {:.2} GB ({:.1}%)", disk.used_space_gb(), disk.usage_percent());
+        println!(
+            "  Used:           {:.2} GB ({:.1}%)",
+            disk.used_space_gb(),
+            disk.usage_percent()
+        );
         println!("  Removable:      {}", disk.is_removable);
         println!();
     }
@@ -169,7 +177,7 @@ mod tests {
     #[test]
     fn test_disk_info_zero_space() {
         let disk = create_test_disk(0, 0);
-        
+
         assert_eq!(disk.used_space(), 0);
         assert_eq!(disk.usage_percent(), 0.0);
         assert_eq!(disk.total_space_gb(), 0.0);
@@ -178,7 +186,7 @@ mod tests {
     #[test]
     fn test_disk_info_full_disk() {
         let disk = create_test_disk(1_073_741_824, 0); // Full disk
-        
+
         assert_eq!(disk.used_space(), 1_073_741_824);
         assert!((disk.usage_percent() - 100.0).abs() < 0.01);
     }
@@ -186,7 +194,7 @@ mod tests {
     #[test]
     fn test_disk_info_empty_disk() {
         let disk = create_test_disk(1_073_741_824, 1_073_741_824); // Empty disk
-        
+
         assert_eq!(disk.used_space(), 0);
         assert!((disk.usage_percent() - 0.0).abs() < 0.01);
     }
@@ -195,7 +203,7 @@ mod tests {
     fn test_disk_info_large_disk() {
         // 1 TB disk
         let disk = create_test_disk(1_099_511_627_776, 549_755_813_888);
-        
+
         assert!((disk.total_space_gb() - 1024.0).abs() < 0.01);
         assert!((disk.available_space_gb() - 512.0).abs() < 0.01);
     }
@@ -205,7 +213,7 @@ mod tests {
         // Edge case: available > total (shouldn't happen, but test saturating behavior)
         let mut disk = create_test_disk(100, 200);
         disk.available_space = 200; // Manually set to test saturating_sub
-        
+
         assert_eq!(disk.used_space(), 0); // Should not underflow
     }
 
@@ -234,7 +242,7 @@ mod tests {
     fn test_disk_info_clone() {
         let disk = create_test_disk(1024, 512);
         let cloned = disk.clone();
-        
+
         assert_eq!(disk.name, cloned.name);
         assert_eq!(disk.total_space, cloned.total_space);
     }
@@ -243,7 +251,7 @@ mod tests {
     fn test_disk_info_debug() {
         let disk = create_test_disk(1024, 512);
         let debug = format!("{:?}", disk);
-        
+
         assert!(debug.contains("DiskInfo"));
         assert!(debug.contains("test"));
     }
