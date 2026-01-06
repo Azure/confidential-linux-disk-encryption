@@ -7,9 +7,8 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 
 /// Get a Command for our binary.
-#[allow(deprecated)]
 fn cde() -> Command {
-    Command::cargo_bin("cde").unwrap()
+    Command::new(assert_cmd::cargo::cargo_bin!("cde"))
 }
 
 #[test]
