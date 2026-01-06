@@ -4,157 +4,237 @@ This document describes the high-level architecture of the Confidential Disk Enc
 
 ## Overview
 
-The Confidential Disk Encryption Extension is a cross-platform tool that runs as an Azure VM extension. It provides disk encryption capabilities for both Linux and Windows virtual machines using platform-native encryption technologies.
+The Confidential Disk Encryption Extension is an **Azure VM extension** that automatically encrypts all data disks attached to a virtual machine. It is installed and managed through Azure (Portal, ARM templates, PowerShell, or Azure CLI) and runs as a background handler on the VM.
 
 ```mermaid
 flowchart TB
-    subgraph Extension["Azure VM Extension"]
-        direction LR
-        Entry["Entry Point<br/>(main.rs)"]
-        
-        subgraph Core["Core Components"]
-            Disk["Disk<br/>Discovery"]
-            Encrypt["Encryption<br/>Provider"]
-            Platform["Platform<br/>Implementation"]
-        end
-        
-        subgraph Platforms["Platform Backends"]
-            LUKS["LUKS<br/>(Linux)"]
-            BitLocker["BitLocker<br/>(Windows)"]
-        end
-        
-        Entry --> Disk
-        Disk --> Encrypt
-        Encrypt --> Platform
-        Platform --> LUKS
-        Platform --> BitLocker
+    subgraph Azure["Azure Platform"]
+        Portal["Azure Portal"]
+        ARM["ARM Template"]
+        PS["PowerShell"]
+        CLI["Azure CLI"]
     end
+    
+    subgraph VM["Azure VM"]
+        subgraph Extension["Confidential Disk Encryption Extension"]
+            Handler["Extension Handler<br/>(install/enable/disable)"]
+            Logger["Centralized Logger<br/>(tracing)"]
+            Discovery["Disk Discovery"]
+            Encryption["Encryption Engine"]
+        end
+        
+        LogFile["/var/log/azure/<br/>confidential-disk-encryption/"]
+        StatusFile["/var/lib/waagent/<br/>&lt;extension&gt;/status/"]
+        
+        subgraph Disks["Data Disks"]
+            D1["Disk 1"]
+            D2["Disk 2"]
+            DN["Disk N"]
+        end
+    end
+    
+    Portal --> Handler
+    ARM --> Handler
+    PS --> Handler
+    CLI --> Handler
+    
+    Handler --> Logger
+    Handler --> Discovery
+    Discovery --> Encryption
+    Encryption --> D1
+    Encryption --> D2
+    Encryption --> DN
+    Logger --> LogFile
+    Handler --> StatusFile
+    StatusFile -->|"status"| Azure
 ```
+
+## Extension Lifecycle
+
+Azure VM extensions follow a specific lifecycle. Our extension implements these handlers:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Install: Extension deployed
+    Install --> Enable: Azure calls enable
+    Enable --> Running: Auto-encrypt disks
+    Running --> Enable: Re-enable (idempotent)
+    Running --> Disable: Azure calls disable
+    Disable --> Enable: Re-enable
+    Enable --> Update: New version
+    Update --> Enable: Updated
+    Disable --> Uninstall: Remove extension
+    Uninstall --> [*]
+```
+
+| Handler | When Called | Our Action |
+|---------|-------------|------------|
+| `install` | Extension first deployed | Initialize directories, validate prerequisites |
+| `enable` | Extension enabled | Discover and encrypt all data disks |
+| `disable` | Extension disabled | Stop operations (disks remain encrypted) |
+| `update` | Extension version updated | Migrate configuration if needed |
+| `uninstall` | Extension removed | Cleanup (disks remain encrypted) |
 
 ## Components
 
-### 1. CLI / Entry Point (`main.rs`)
+### 1. Extension Handler (`handler.rs`)
 
-The command-line interface that serves as the entry point for the extension. Responsibilities:
+The main entry point that implements the Azure VM extension interface:
 
-- Parse command-line arguments
-- Initialize logging
-- Orchestrate operations by calling library functions
-- Report status back to Azure
+- Parses extension configuration from Azure
+- Orchestrates disk discovery and encryption
+- Reports status back to Azure
+- Handles the extension lifecycle (install/enable/disable/update/uninstall)
 
-### 2. Disk Module (`disk/`)
+### 2. Centralized Logger (`logging.rs`)
 
-Handles all disk-related operations:
+Uses the `tracing` crate for structured, contextual logging:
 
-- **Discovery**: Enumerate available disks on the system
-- **Validation**: Check if a disk is suitable for encryption
-- **Information**: Retrieve disk metadata (size, filesystem, mount point)
-
-### 3. Error Handling (`error.rs`)
-
-Centralized error types for the project:
-
-- Custom error enum covering all failure modes
-- Integration with Rust's `std::error::Error` trait
-- User-friendly error messages
-
-## Design Principles
-
-### Cross-Platform Abstraction
-
-The code uses Rust's conditional compilation (`#[cfg(target_os = "...")]`) to provide platform-specific implementations while maintaining a unified API.
+- **File output**: `/var/log/azure/confidential-disk-encryption/extension.log`
+- **Structured logs**: Key-value pairs for easy parsing
+- **Span context**: Tracks which disk/operation is being performed
+- **Log levels**: ERROR, WARN, INFO, DEBUG, TRACE
 
 ```rust
-// Example pattern for platform abstraction
-pub trait DiskOperations {
-    fn list_disks(&self) -> Result<Vec<DiskInfo>, Error>;
-    fn get_disk_info(&self, path: &str) -> Result<DiskInfo, Error>;
-}
-
-#[cfg(target_os = "linux")]
-mod linux;
-
-#[cfg(target_os = "windows")]
-mod windows;
+// Example log output
+2024-01-05T16:52:00Z INFO handler: Extension enabled, starting disk encryption
+2024-01-05T16:52:01Z INFO discovery: Discovered 3 data disks
+2024-01-05T16:52:01Z INFO encrypt{disk=/dev/sdb1}: Starting encryption
+2024-01-05T16:52:30Z INFO encrypt{disk=/dev/sdb1}: Encryption complete
+2024-01-05T16:52:30Z ERROR encrypt{disk=/dev/sdc1}: Encryption failed error="Device busy"
 ```
 
-### Modular Structure
+### 3. Disk Module (`disk/`)
 
-Each component is a separate module that can be:
-- Developed independently
-- Tested in isolation
-- Replaced or extended without affecting other components
+Handles disk discovery and filtering:
 
-### Error Propagation
+- **Discovery**: Enumerate all attached disks
+- **Filtering**: Identify data disks (exclude OS disk, already encrypted, etc.)
+- **Validation**: Check disk is suitable for encryption
 
-All fallible operations return `Result<T, Error>` using a project-specific error type. This ensures:
-- Consistent error handling throughout the codebase
-- Clear error messages for users
-- Proper error context propagation
+### 4. Encryption Module (`encryption/`)
 
-## Future Components (Planned)
+Platform-specific encryption implementations:
 
-These components will be added as the project evolves:
+- **Linux**: LUKS2 via `cryptsetup`
+- **Windows**: BitLocker via `manage-bde`
 
-### Encryption Module (`encryption/`)
+### 5. Error Handling (`error.rs`)
 
-- Abstract encryption provider interface
-- LUKS implementation for Linux
-- BitLocker implementation for Windows
-- Key management integration
+Centralized error types that integrate with the logger:
 
-### Azure Integration (`azure/`)
-
-- Extension handler implementation
-- Configuration parsing
-- Status reporting to Azure
-- Integration with Azure Key Vault
+- All errors are logged with context
+- Errors are reported to Azure via status file
+- User-friendly error messages
 
 ## Data Flow
 
 ```mermaid
 sequenceDiagram
     participant Azure as Azure Platform
-    participant Ext as Extension
-    participant Disk as Disk Module
-    participant Enc as Encryption Provider
-    participant OS as OS (LUKS/BitLocker)
+    participant Handler as Extension Handler
+    participant Logger as Logger
+    participant Disk as Disk Discovery
+    participant Enc as Encryption Engine
+    participant FS as Filesystem
 
-    Azure->>Ext: Enable Extension
-    Ext->>Ext: Parse Configuration
-    Ext->>Disk: Discover Disks
-    Disk-->>Ext: Disk List
-    Ext->>Disk: Validate Target Disks
-    Disk-->>Ext: Validation Result
-    Ext->>Enc: Request Encryption
-    Enc->>Azure: Fetch Key from Key Vault
-    Azure-->>Enc: Encryption Key
-    Enc->>OS: Apply Encryption
-    OS-->>Enc: Encryption Complete
-    Enc-->>Ext: Success
-    Ext->>Azure: Report Status
+    Azure->>Handler: Enable Extension
+    Handler->>Logger: Initialize logging
+    Logger->>FS: Create log file
+    Handler->>Logger: info!("Extension enabled")
+    
+    Handler->>Disk: Discover data disks
+    Disk-->>Handler: Vec<DiskInfo>
+    Handler->>Logger: info!("Found {} disks", count)
+    
+    loop For each data disk
+        Handler->>Enc: Encrypt disk
+        Enc->>Logger: info!("Starting encryption")
+        alt Success
+            Enc-->>Handler: Ok
+            Enc->>Logger: info!("Encryption complete")
+        else Failure
+            Enc-->>Handler: Err
+            Enc->>Logger: error!("Encryption failed")
+        end
+    end
+    
+    Handler->>FS: Write status file
+    Handler->>Azure: Report completion status
 ```
 
-### Steps
+## File Locations
 
-1. **Initialization**: Extension starts, parses configuration from Azure
-2. **Discovery**: Enumerate disks, identify targets for encryption
-3. **Validation**: Verify disks meet requirements (not already encrypted, correct type, etc.)
-4. **Key Retrieval**: Fetch encryption key from Azure Key Vault
-5. **Encryption**: Apply encryption using platform-native tools (LUKS/BitLocker)
-6. **Reporting**: Report status back to Azure
+| Path | Purpose |
+|------|---------|
+| `/var/log/azure/confidential-disk-encryption/extension.log` | Operation logs |
+| `/var/lib/waagent/<extension>/status/<seq>.status` | Azure status reporting |
+| `/var/lib/waagent/<extension>/config/<seq>.settings` | Extension configuration |
+
+## Module Structure
+
+```
+src/
+├── lib.rs                    # Library root, re-exports
+├── handler.rs                # Azure extension handlers
+├── logging.rs                # Centralized tracing setup
+├── disk/
+│   ├── mod.rs               # Disk module root
+│   ├── discovery.rs         # Find all disks
+│   └── filter.rs            # Filter to data disks only
+├── encryption/
+│   ├── mod.rs               # Encryption module root
+│   ├── provider.rs          # Encryption trait
+│   ├── luks.rs              # Linux LUKS2 implementation
+│   └── bitlocker.rs         # Windows BitLocker implementation
+└── error.rs                 # Error types
+```
+
+## Design Principles
+
+### Automatic Operation
+
+The extension requires **no user interaction** after deployment:
+- Automatically discovers all data disks
+- Encrypts each disk without prompts
+- Reports status to Azure for monitoring
+
+### Idempotent Operations
+
+Running `enable` multiple times is safe:
+- Already-encrypted disks are skipped
+- Operation status is tracked
+- No data loss on re-runs
+
+### Centralized Logging
+
+All operations flow through a single logger:
+- Consistent log format
+- Contextual information (which disk, which operation)
+- Easy troubleshooting
+
+### Graceful Error Handling
+
+Errors on one disk don't stop others:
+- Each disk is processed independently
+- Errors are logged and reported
+- Overall status reflects all operations
 
 ## Dependencies
 
 | Crate | Purpose |
 |-------|---------|
-| `sysinfo` | Cross-platform system/disk information |
-| `thiserror` | Derive macro for error types (planned) |
-| `clap` | Command-line argument parsing (planned) |
-| `tracing` | Structured logging (planned) |
+| `sysinfo` | Cross-platform disk discovery |
+| `thiserror` | Error type derivation |
+| `tracing` | Structured logging |
+| `tracing-subscriber` | Log output formatting |
+| `tracing-appender` | File-based log output |
+| `serde` | Configuration parsing (planned) |
+| `serde_json` | JSON status files (planned) |
 
 ## References
 
 - [Azure VM Extensions Overview](https://docs.microsoft.com/azure/virtual-machines/extensions/overview)
-- [LUKS Documentation](https://gitlab.com/cryptsetup/cryptsetup)
-- [BitLocker Documentation](https://docs.microsoft.com/windows/security/information-protection/bitlocker/bitlocker-overview)
+- [Linux VM Extension Authoring](https://docs.microsoft.com/azure/virtual-machines/extensions/custom-script-linux)
+- [tracing crate documentation](https://docs.rs/tracing)
+- [LUKS2 Specification](https://gitlab.com/cryptsetup/cryptsetup)

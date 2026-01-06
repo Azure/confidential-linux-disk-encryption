@@ -1,0 +1,5 @@
+2026-01-06T01:00:23.199368Z  INFO cde: src\main.rs:88: Extension invoked command=DryRun
+2026-01-06T01:00:23.199820Z  INFO enable: confidential_disk_encryption::handler: src\handler.rs:60: Enabling Confidential Disk Encryption extension
+2026-01-06T01:00:23.200394Z  INFO enable: confidential_disk_encryption::handler: src\handler.rs:64: Discovered disks disk_count=1
+2026-01-06T01:00:23.200621Z  INFO enable: confidential_disk_encryption::handler: src\handler.rs:68: Identified data disks data_disk_count=0
+2026-01-06T01:00:23.200871Z  WARN enable: confidential_disk_encryption::handler: src\handler.rs:71: No data disks found to encrypt

@@ -1,0 +1,316 @@
+//! Azure VM Extension handler module.
+//!
+//! This module implements the Azure VM extension lifecycle handlers:
+//! - `install` - Called when the extension is first deployed
+//! - `enable` - Called when the extension is enabled (main operation)
+//! - `disable` - Called when the extension is disabled
+//! - `update` - Called when the extension is updated
+//! - `uninstall` - Called when the extension is removed
+//!
+//! The extension automatically encrypts all data disks when enabled.
+
+use crate::disk::{self, DiskInfo};
+use crate::error::{Error, Result};
+use tracing::{error, info, instrument, warn};
+
+/// Extension handler that manages the extension lifecycle.
+#[derive(Debug)]
+pub struct ExtensionHandler {
+    /// Whether to run in dry-run mode (no actual encryption).
+    dry_run: bool,
+}
+
+impl ExtensionHandler {
+    /// Create a new extension handler.
+    pub fn new() -> Self {
+        Self { dry_run: false }
+    }
+
+    /// Create a new extension handler in dry-run mode.
+    ///
+    /// In dry-run mode, the handler will discover disks and log what it would do,
+    /// but will not actually perform encryption.
+    pub fn new_dry_run() -> Self {
+        Self { dry_run: true }
+    }
+
+    /// Handle the `install` command.
+    ///
+    /// Called when the extension is first deployed to the VM.
+    /// Validates prerequisites and initializes required directories.
+    #[instrument(skip(self), name = "install")]
+    pub fn handle_install(&self) -> Result<()> {
+        info!("Installing Confidential Disk Encryption extension");
+
+        // Validate prerequisites
+        self.validate_prerequisites()?;
+
+        info!("Extension installed successfully");
+        Ok(())
+    }
+
+    /// Handle the `enable` command.
+    ///
+    /// Called when the extension is enabled. This is the main operation that:
+    /// 1. Discovers all attached disks
+    /// 2. Filters to data disks only
+    /// 3. Encrypts each eligible disk
+    #[instrument(skip(self), name = "enable")]
+    pub fn handle_enable(&self) -> Result<()> {
+        info!("Enabling Confidential Disk Encryption extension");
+
+        // Discover all disks
+        let all_disks = disk::discover_disks();
+        info!(disk_count = all_disks.len(), "Discovered disks");
+
+        // Filter to data disks only
+        let data_disks = self.filter_data_disks(&all_disks);
+        info!(data_disk_count = data_disks.len(), "Identified data disks");
+
+        if data_disks.is_empty() {
+            warn!("No data disks found to encrypt");
+            return Ok(());
+        }
+
+        // Encrypt each data disk
+        let mut success_count = 0;
+        let mut failure_count = 0;
+
+        for disk in &data_disks {
+            match self.encrypt_disk(disk) {
+                Ok(()) => {
+                    success_count += 1;
+                }
+                Err(e) => {
+                    error!(
+                        disk = %disk.name,
+                        error = %e,
+                        "Failed to encrypt disk"
+                    );
+                    failure_count += 1;
+                }
+            }
+        }
+
+        info!(
+            success_count,
+            failure_count,
+            "Disk encryption completed"
+        );
+
+        if failure_count > 0 {
+            return Err(Error::DiskOperation(format!(
+                "Failed to encrypt {} disk(s)",
+                failure_count
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Handle the `disable` command.
+    ///
+    /// Called when the extension is disabled. Disks remain encrypted.
+    #[instrument(skip(self), name = "disable")]
+    pub fn handle_disable(&self) -> Result<()> {
+        info!("Disabling Confidential Disk Encryption extension");
+        info!("Note: Encrypted disks will remain encrypted");
+        Ok(())
+    }
+
+    /// Handle the `update` command.
+    ///
+    /// Called when the extension is updated to a new version.
+    #[instrument(skip(self), name = "update")]
+    pub fn handle_update(&self) -> Result<()> {
+        info!("Updating Confidential Disk Encryption extension");
+        // Future: Handle configuration migration if needed
+        info!("Extension updated successfully");
+        Ok(())
+    }
+
+    /// Handle the `uninstall` command.
+    ///
+    /// Called when the extension is removed. Disks remain encrypted.
+    #[instrument(skip(self), name = "uninstall")]
+    pub fn handle_uninstall(&self) -> Result<()> {
+        info!("Uninstalling Confidential Disk Encryption extension");
+        info!("Note: Encrypted disks will remain encrypted");
+        // Future: Cleanup any extension-specific files
+        Ok(())
+    }
+
+    /// Validate that prerequisites are met for the extension to run.
+    fn validate_prerequisites(&self) -> Result<()> {
+        // Check for cryptsetup on Linux
+        #[cfg(target_os = "linux")]
+        {
+            if !self.command_exists("cryptsetup") {
+                return Err(Error::Platform(
+                    "cryptsetup is required but not found. Install with: apt install cryptsetup".to_string(),
+                ));
+            }
+            info!("cryptsetup found");
+        }
+
+        // Check for BitLocker on Windows
+        #[cfg(target_os = "windows")]
+        {
+            if !self.command_exists("manage-bde") {
+                return Err(Error::Platform(
+                    "BitLocker (manage-bde) is required but not found".to_string(),
+                ));
+            }
+            info!("BitLocker (manage-bde) found");
+        }
+
+        Ok(())
+    }
+
+    /// Check if a command exists on the system.
+    fn command_exists(&self, command: &str) -> bool {
+        #[cfg(target_os = "windows")]
+        let check = std::process::Command::new("where")
+            .arg(command)
+            .output();
+
+        #[cfg(not(target_os = "windows"))]
+        let check = std::process::Command::new("which")
+            .arg(command)
+            .output();
+
+        match check {
+            Ok(output) => output.status.success(),
+            Err(_) => false,
+        }
+    }
+
+    /// Filter disks to only include data disks (exclude OS disk).
+    fn filter_data_disks<'a>(&self, disks: &'a [DiskInfo]) -> Vec<&'a DiskInfo> {
+        disks
+            .iter()
+            .filter(|disk| self.is_data_disk(disk))
+            .collect()
+    }
+
+    /// Determine if a disk is a data disk (not the OS disk).
+    fn is_data_disk(&self, disk: &DiskInfo) -> bool {
+        let mount_point = disk.mount_point.to_string_lossy();
+
+        // Exclude OS disk mount points
+        // On Linux, exclude root and boot partitions
+        if mount_point == "/" || mount_point.starts_with("/boot") {
+            return false;
+        }
+
+        // On Windows, exclude C: drive (typically the OS disk)
+        if mount_point.to_uppercase().starts_with("C:") {
+            return false;
+        }
+
+        // Exclude removable disks
+        if disk.is_removable {
+            return false;
+        }
+
+        true
+    }
+
+    /// Encrypt a single disk.
+    #[instrument(skip(self), fields(disk = %disk.name))]
+    fn encrypt_disk(&self, disk: &DiskInfo) -> Result<()> {
+        info!(
+            mount_point = %disk.mount_point.display(),
+            file_system = %disk.file_system,
+            size_gb = disk.total_space_gb(),
+            "Starting disk encryption"
+        );
+
+        if self.dry_run {
+            info!("Dry-run mode: Skipping actual encryption");
+            return Ok(());
+        }
+
+        // TODO: Implement actual encryption
+        // For now, we just log what we would do
+        warn!("Encryption not yet implemented");
+
+        Ok(())
+    }
+}
+
+impl Default for ExtensionHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use crate::disk::DiskType;
+
+    fn create_test_disk(name: &str, mount_point: &str, is_removable: bool) -> DiskInfo {
+        DiskInfo {
+            name: name.to_string(),
+            mount_point: PathBuf::from(mount_point),
+            file_system: "ext4".to_string(),
+            disk_type: DiskType::SSD,
+            total_space: 1_073_741_824,
+            available_space: 536_870_912,
+            is_removable,
+        }
+    }
+
+    #[test]
+    fn test_is_data_disk_excludes_root() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sda1", "/", false);
+        assert!(!handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_excludes_boot() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sda2", "/boot", false);
+        assert!(!handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_excludes_removable() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sdb1", "/mnt/usb", true);
+        assert!(!handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_is_data_disk_includes_data_mount() {
+        let handler = ExtensionHandler::new();
+        let disk = create_test_disk("sdc1", "/mnt/data", false);
+        assert!(handler.is_data_disk(&disk));
+    }
+
+    #[test]
+    fn test_filter_data_disks() {
+        let handler = ExtensionHandler::new();
+        let disks = vec![
+            create_test_disk("sda1", "/", false),
+            create_test_disk("sda2", "/boot", false),
+            create_test_disk("sdb1", "/mnt/data1", false),
+            create_test_disk("sdc1", "/mnt/data2", false),
+            create_test_disk("sdd1", "/mnt/usb", true),
+        ];
+
+        let data_disks = handler.filter_data_disks(&disks);
+        assert_eq!(data_disks.len(), 2);
+        assert_eq!(data_disks[0].name, "sdb1");
+        assert_eq!(data_disks[1].name, "sdc1");
+    }
+
+    #[test]
+    fn test_dry_run_mode() {
+        let handler = ExtensionHandler::new_dry_run();
+        assert!(handler.dry_run);
+    }
+}
